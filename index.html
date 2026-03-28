@@ -354,6 +354,10 @@ let calAssignments = {};
 // removedPatients[monthKey] = Set of globalIdx integers removed by user on page 1
 let removedPatients = {};
 
+// calWeekStart/End[calKey] = ISO date strings for the user-chosen VOR date range
+let calWeekStart = {};
+let calWeekEnd   = {};
+
 // ═══════════════════════════════════════════════
 // NAME PARSING
 // ═══════════════════════════════════════════════
@@ -859,7 +863,7 @@ function renderPlanScreen(){
         <td class="td-name">${p.patientName}</td>
         <td>${p.provider}</td>
         <td><span class="badge b-cleared">Cleared</span></td>
-        <td><input class="stim-input" type="number" min="8" max="18" data-idx="${p.globalIdx}" value="${stim}" title="Days from first injection to trigger night. Retrieval = trigger + 2 days."></td>
+        <td><input class="stim-input" type="number" min="8" max="18" data-idx="${p.globalIdx}" value="${stim}" title="Number of stim days (injections). Trigger = night after last stim day. Retrieval = trigger + 1 day."></td>
       </tr>`;
     }
   }
@@ -900,6 +904,37 @@ function goToCalFromPlan(){
 // ═══════════════════════════════════════════════
 // SCREEN 3 — CALENDAR
 // ═══════════════════════════════════════════════
+
+function getCalWeekMonday(ck, fallbackKey) {
+  if (calWeekStart[ck]) {
+    return new Date(calWeekStart[ck] + 'T12:00:00');
+  }
+  return firstMondayOf(fallbackKey);
+}
+
+function getCalWeekDays(ck, fallbackKey) {
+  const monday = getCalWeekMonday(ck, fallbackKey);
+  // End date
+  let endDate = null;
+  if (calWeekEnd[ck]) {
+    endDate = new Date(calWeekEnd[ck] + 'T12:00:00');
+  }
+  // Build Mon-Fri days between monday and endDate (inclusive), skip weekends
+  const days = [];
+  const cur = new Date(monday);
+  const limit = endDate || addDays(monday, 4); // default = Mon-Fri (5 days)
+  while (cur <= limit) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) days.push(new Date(cur)); // skip Sat/Sun
+    cur.setDate(cur.getDate() + 1);
+  }
+  // Always show at least Mon-Fri
+  if (days.length === 0) {
+    for (let i = 0; i < 5; i++) days.push(addDays(monday, i));
+  }
+  return days;
+}
+
 function renderCalScreen(){
   const{sortedKeys,byMonth}=allMonthData;
   const key=sortedKeys[currentMonthIdx];
@@ -920,38 +955,37 @@ function renderCalScreen(){
     return;
   }
 
-  // Initialize assignments dict
+  // Initialize assignments dict — do NOT auto-distribute
   if(!calAssignments[ck])calAssignments[ck]={};
 
-  // Auto-distribute any unassigned patients
-  autoDistribute(patients);
-
-  // Compute the batch week: first Monday of the month
-  const batchMonday=firstMondayOf(key);
+  // Compute week days from user-set range or default
+  const weekDays = getCalWeekDays(ck, key);
+  const numDays = weekDays.length;
 
   // Count totals
   const totalPts=patients.length;
-  const scheduled=patients.filter(p=>calAssignments[ck][p.globalIdx]!=null).length;
-  const unscheduled=totalPts-scheduled;
-
-  // Compute day dates (Mon-Fri)
-  const weekDays=[];
-  for(let i=0;i<5;i++)weekDays.push(addDays(batchMonday,i));
+  const scheduled=patients.filter(p=>calAssignments[ck][p.globalIdx]!=null&&calAssignments[ck][p.globalIdx]>=0&&calAssignments[ck][p.globalIdx]<numDays).length;
 
   // Group patients by assigned day
-  const byDay={0:[],1:[],2:[],3:[],4:[]};
+  const byDay={};
+  for(let i=0;i<numDays;i++) byDay[i]=[];
   const poolPts=[];
   for(const p of patients){
     const a=calAssignments[ck][p.globalIdx];
-    if(a!=null&&a>=0&&a<=4) byDay[a].push(p);
+    if(a!=null&&a>=0&&a<numDays) byDay[a].push(p);
     else poolPts.push(p);
   }
 
-  // Heavy day detection: Eggs = over 5 cap, IVF = busiest day
+  // Heavy day detection
   const dayCounts=Object.values(byDay).map(arr=>arr.length);
   const maxCount=Math.max(...dayCounts,1);
   const isEggsMode=planBatchType==='ef';
   const EGGS_CAP=5;
+
+  // Current date picker values
+  const vorMonday = getCalWeekMonday(ck, key);
+  const mondayISO = vorMonday.toISOString().slice(0,10);
+  const endISO = calWeekEnd[ck] || addDays(vorMonday, 4).toISOString().slice(0,10);
 
   let html=`
   <div class="cal-topbar anim d1">
@@ -964,42 +998,66 @@ function renderCalScreen(){
       <div class="cal-legend">
         <span><span class="leg-dot leg-${planBatchType}"></span>${bLabel}</span>
         ${planBatchType==='ef'?'<span style="font-size:10px;color:var(--amber);font-weight:600;">Max 5/day</span>':''}
-        <span style="font-size:10px;color:var(--text-dim)">Drag to balance load</span>
+        <span style="font-size:10px;color:var(--text-dim)">Drag patients from pool below</span>
       </div>
       <button class="btn btn-primary btn-sm" onclick="downloadExcel()" style="display:flex;align-items:center;gap:5px;">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M8 10l-3-3M8 10l3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="12" width="12" height="2" rx="1" fill="currentColor"/></svg>
         Download Excel
       </button>
     </div>
+  </div>
+
+  <!-- DATE RANGE CONTROLS -->
+  <div class="section-card anim d2" style="margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;">Target VOR Week Start (Monday)</div>
+        <input type="date" id="vorStartInput" value="${mondayISO}"
+          style="padding:6px 10px;border:1px solid var(--border2);border-radius:7px;font-family:'Montserrat',sans-serif;font-size:13px;color:var(--text);">
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;">Range End Date (for wiggle room)</div>
+        <input type="date" id="vorEndInput" value="${endISO}"
+          style="padding:6px 10px;border:1px solid var(--border2);border-radius:7px;font-family:'Montserrat',sans-serif;font-size:13px;color:var(--text);">
+      </div>
+      <div style="align-self:flex-end;">
+        <button class="btn btn-secondary btn-sm" onclick="applyVORDates()">Apply Dates</button>
+      </div>
+      <div style="align-self:flex-end;font-size:11px;color:var(--text-muted);">
+        Showing ${numDays} day${numDays!==1?'s':''} &middot; Weekends excluded
+      </div>
+    </div>
   </div>`;
 
-  // Unscheduled pool (shouldn't appear after auto-distribute, but just in case)
-  if(poolPts.length>0){
-    html+=`<div class="unscheduled-pool anim d2">
-      <div class="pool-label">Unscheduled (${poolPts.length})</div>
-      <div class="pool-chips" id="pool-drop" data-day="pool">`;
-    for(const p of poolPts){
+  // Unscheduled pool — always visible, patients start here
+  html+=`<div class="unscheduled-pool anim d2" style="margin-bottom:14px;">
+    <div class="pool-label">Patient Bank — drag to assign a retrieval day (${poolPts.length} unassigned${scheduled>0?', '+scheduled+' placed':''})</div>
+    <div class="pool-chips" id="pool-drop" data-day="pool">`;
+  if(poolPts.length===0){
+    html+=`<div style="color:var(--text-dim);font-size:12px;padding:8px;font-style:italic;">All patients placed ✓</div>`;
+  } else {
+    for(const p of poolPts.sort((a,b)=>a.patientName.localeCompare(b.patientName))){
       html+=chipHTML(p,mk,ck);
     }
-    html+=`</div></div>`;
   }
+  html+=`</div></div>`;
 
-  html+=`<div class="cal-grid anim d3">`;
+  html+=`<div class="cal-grid anim d3" style="grid-template-columns:repeat(${Math.min(numDays,5)},1fr);">`;
 
-  for(let di=0;di<5;di++){
+  for(let di=0;di<numDays;di++){
     const d=weekDays[di];
     const pts=byDay[di];
-    const isHeavy=isEggsMode ? pts.length>EGGS_CAP : (pts.length===maxCount&&pts.length>1);
+    const isHeavy=isEggsMode ? pts.length>EGGS_CAP : (pts.length===maxCount&&pts.length>1&&maxCount>1);
     const isOverCap=isEggsMode&&pts.length>EGGS_CAP;
-    // Calculate estimated retrieval week based on avg stim days
     const avgStim=pts.length>0?Math.round(pts.reduce((s,p)=>s+getStimDays(p.globalIdx),0)/pts.length):11;
-    const retDate=addDays(d,avgStim);
+    const startDate=addDays(d,-(avgStim+1));
 
     html+=`<div class="cal-col${isHeavy?' heavy':''}${isOverCap?' over-cap':''}" id="col-${di}" data-day="${di}">
       <div class="cal-col-header">
         <div class="cal-col-day">${DAY_NAMES[d.getDay()]}</div>
         <div style="font-family:'Playfair Display',serif;font-size:16px;color:var(--text);line-height:1.2;">${fmtShortDate(d)}</div>
         <div class="cal-col-count">${pts.length} patient${pts.length!==1?'s':''}${isOverCap?' ⚠ over limit':''}</div>
+        ${pts.length>0?`<div style="font-size:9px;color:var(--text-dim);margin-top:2px;">stim start ~${fmtShortDate(startDate)}</div>`:''}
       </div>
       <div class="cal-patients" id="patients-${di}" data-day="${di}">`;
 
@@ -1015,22 +1073,12 @@ function renderCalScreen(){
 
   html+=`</div>`;
 
-  // ── MED START DATES — 5-col grid, each col = a retrieval day → shows computed start date ──
-  // For each retrieval-day column, compute per-patient start dates and group by unique start date
-  // Each start date group gets its own mini-column with full chips
-
-  // Collect all unique start dates across all patients
-  // Correct math:
-  //   Day 1 = med start (stimulation begins)
-  //   Trigger night = medStart + stimDays - 1  (trigger is on the last stim evening)
-  //   Retrieval = trigger + 2 days (36h later), next weekday
-  //   → medStart = retrieval - stimDays - 1
-  const allStartMap = {}; // iso -> {date, patients:[]}
-  for(let di=0;di<5;di++){
+  // ── MED START DATES ──
+  const allStartMap = {};
+  for(let di=0;di<numDays;di++){
     const retDay = weekDays[di];
     for(const p of byDay[di]){
       const stim = getStimDays(p.globalIdx);
-      // retrieval = start + stimDays + 1  →  start = retrieval - stimDays - 1
       const sd = addDays(retDay, -(stim + 1));
       const iso = sd.getFullYear()+'-'+String(sd.getMonth()+1).padStart(2,'0')+'-'+String(sd.getDate()).padStart(2,'0');
       if(!allStartMap[iso]) allStartMap[iso]={date:sd, patients:[]};
@@ -1042,13 +1090,12 @@ function renderCalScreen(){
   html+=`<div style="margin-top:18px;margin-bottom:6px;">
     <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
       Med Start Dates
-      <span style="font-size:9px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--text-dim);">↳ day 1 of injections · trigger on night of day N · retrieval 36h later (next weekday)</span>
+      <span style="font-size:9px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--text-dim);">↳ day 1 of injections · trigger night after last stim day · retrieval next day</span>
     </div>`;
 
   if(sortedStartDates.length===0){
-    html+=`<div style="color:var(--text-dim);font-size:12px;padding:12px 0;">No patients assigned yet.</div>`;
+    html+=`<div style="color:var(--text-dim);font-size:12px;padding:12px 0;">No patients assigned yet — drag patients from the bank above.</div>`;
   } else {
-    // Lay them out in a flexible grid — up to 5 cols
     const cols = Math.min(sortedStartDates.length, 5);
     html+=`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px;align-items:start;">`;
     for(const entry of sortedStartDates){
@@ -1080,8 +1127,43 @@ function renderCalScreen(){
 
   document.getElementById('calContent').innerHTML=html;
 
-  // Wire drag and drop
-  wireDragDrop(patients,ck);
+  // Wire date pickers
+  document.getElementById('vorStartInput').addEventListener('change', function(){
+    // snap to Monday of selected week
+    const d = new Date(this.value+'T12:00:00');
+    const dow = d.getDay();
+    const offset = dow===0?1:-(dow-1);
+    const monday = addDays(d, offset);
+    calWeekStart[ck] = monday.toISOString().slice(0,10);
+    // If end is before new monday, push it to Fri of that week
+    if(!calWeekEnd[ck]||calWeekEnd[ck]<calWeekStart[ck]){
+      calWeekEnd[ck] = addDays(monday,4).toISOString().slice(0,10);
+    }
+  });
+  document.getElementById('vorEndInput').addEventListener('change', function(){
+    calWeekEnd[ck] = this.value;
+  });
+
+  // Wire drag and drop (pool is always a drop zone)
+  wireDragDrop(patients,ck,numDays);
+}
+
+function applyVORDates(){
+  const ck=calKey();
+  const startEl=document.getElementById('vorStartInput');
+  const endEl=document.getElementById('vorEndInput');
+  if(startEl&&startEl.value){
+    const d=new Date(startEl.value+'T12:00:00');
+    const dow=d.getDay();
+    // Snap to Monday of the same week: Sun→+1, Mon→0, Tue-Sat→back
+    const offset=dow===0?1:-(dow-1);
+    const monday=addDays(d,offset);
+    calWeekStart[ck]=monday.toISOString().slice(0,10);
+  }
+  if(endEl&&endEl.value){
+    calWeekEnd[ck]=endEl.value;
+  }
+  renderCalScreen();
 }
 
 // ═══════════════════════════════════════════════
@@ -1092,9 +1174,7 @@ function downloadExcel(){
   const key=sortedKeys[currentMonthIdx];
   const ck=calKey();
   const bLabel=planBatchType==='ivf'?'IVF':'Eggs';
-  const batchMonday=firstMondayOf(key);
-  const weekDays=[];
-  for(let i=0;i<5;i++) weekDays.push(addDays(batchMonday,i));
+  const weekDays=getCalWeekDays(ck,key);
 
   const patients=byMonth[key]
     .map((r,i)=>({...r,globalIdx:i}))
@@ -1192,7 +1272,8 @@ function chipHTML(p,mk,ck){
 let dragIdx=null;
 let dragSourceDay=null;
 
-function wireDragDrop(patients,ck){
+function wireDragDrop(patients,ck,numDays){
+  numDays = numDays||5;
   // All chips
   document.querySelectorAll('.chip').forEach(chip=>{
     chip.addEventListener('dragstart',e=>{
@@ -1234,7 +1315,7 @@ function wireDragDrop(patients,ck){
         calAssignments[ck][dragIdx]=null;
       } else {
         const di=parseInt(targetDay);
-        calAssignments[ck][dragIdx]=di;
+        if(!isNaN(di)&&di>=0&&di<numDays) calAssignments[ck][dragIdx]=di;
       }
       dragIdx=null;
       renderCalScreen(); // re-render with new assignment
