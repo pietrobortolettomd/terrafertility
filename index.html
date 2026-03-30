@@ -1050,7 +1050,7 @@ function renderCalScreen(){
     const isHeavy=isEggsMode ? pts.length>EGGS_CAP : (pts.length===maxCount&&pts.length>1&&maxCount>1);
     const isOverCap=isEggsMode&&pts.length>EGGS_CAP;
     const avgStim=pts.length>0?Math.round(pts.reduce((s,p)=>s+getStimDays(p.globalIdx),0)/pts.length):11;
-    const startDate=addDays(d,-(avgStim+1));
+    const startDate=addDays(d,-avgStim);
 
     html+=`<div class="cal-col${isHeavy?' heavy':''}${isOverCap?' over-cap':''}" id="col-${di}" data-day="${di}">
       <div class="cal-col-header">
@@ -1079,7 +1079,7 @@ function renderCalScreen(){
     const retDay = weekDays[di];
     for(const p of byDay[di]){
       const stim = getStimDays(p.globalIdx);
-      const sd = addDays(retDay, -(stim + 1));
+      const sd = addDays(retDay, -stim);
       const iso = sd.getFullYear()+'-'+String(sd.getMonth()+1).padStart(2,'0')+'-'+String(sd.getDate()).padStart(2,'0');
       if(!allStartMap[iso]) allStartMap[iso]={date:sd, patients:[]};
       allStartMap[iso].patients.push({...p, retDayIdx:di, stimDays:stim});
@@ -1186,8 +1186,8 @@ function downloadExcel(){
     const di = calAssignments[ck]&&calAssignments[ck][p.globalIdx]!=null ? calAssignments[ck][p.globalIdx] : null;
     const stim = getStimDays(p.globalIdx);
     const retDay = di!=null ? weekDays[di] : null;
-    // retrieval = medStart + stimDays + 1  →  medStart = retrieval - stimDays - 1
-    const startDay = retDay ? addDays(retDay, -(stim + 1)) : null;
+    // retrieval = medStart + stimDays  →  medStart = retrieval - stimDays
+    const startDay = retDay ? addDays(retDay, -stim) : null;
     const fmt = d => d ? `${DAY_FULL[d.getDay()]} ${fmtShortDate(d)}` : '';
     rows.push({
       'Patient':       p.patientName,
@@ -1257,11 +1257,26 @@ function _buildAndDownload(rows,bLabel,monthLabel){
   XLSX.writeFile(wb, `Terra_${bLabel.replace(' ','_')}_Batch_${monthLabel.replace(' ','_')}.xlsx`);
 }
 
+function treatmentShort(raw) {
+  if(!raw) return '';
+  const t = raw.toLowerCase();
+  if(t.includes('fresh')) return 'Fresh ET';
+  if(t.includes('freeze all')||t.includes('freeze-all')) return 'Freeze All';
+  if(t.includes('egg freez')||t.includes('egg bank')||t.includes('oocyte')) return 'Egg Freeze';
+  if(t.includes('cryo')&&t.includes('pgt')) return 'Cryo+PGT';
+  if(t.includes('cryo')||t.includes('frozen')) return 'Cryo ET';
+  if(t.includes('pgt')) return 'PGT';
+  if(t.includes('ivf')) return 'IVF';
+  return raw.length>18 ? raw.slice(0,17)+'…' : raw;
+}
+
 function chipHTML(p,mk,ck){
   const stim=getStimDays(p.globalIdx);
   const chipClass=planBatchType==='ivf'?'chip-ivf':'chip-ef';
-  return `<div class="chip ${chipClass}" draggable="true" data-idx="${p.globalIdx}" title="Drag to move · Stim: ${stim}d">
-    <div class="chip-name">${p.patientName}</div>
+  const txShort=treatmentShort(p.treatment);
+  const txBadge=txShort?`<span style="display:inline-block;font-size:9px;font-weight:600;letter-spacing:0.04em;padding:1px 5px;border-radius:3px;background:rgba(0,0,0,0.07);color:var(--text-mid);margin-left:3px;">${txShort}</span>`:'';
+  return `<div class="chip ${chipClass}" draggable="true" data-idx="${p.globalIdx}" title="${p.treatment||''} · Stim: ${stim}d">
+    <div class="chip-name">${p.patientName}${txBadge}</div>
     <div class="chip-meta">${p.provider} &middot; ${stim}d stim</div>
   </div>`;
 }
