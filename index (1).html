@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terra Batch Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#5c665d;--green-mid:#6e7d6f;--green-light:#e8ede9;--green-pale:#f2f5f2;
+  --sage:#a9b39b;--sage-light:#c9d4c0;
+  --cream:#fcf8f0;--cream2:#f3ede3;--cream3:#e8e0d4;
+  --text:#0e1b0f;--text-mid:#3a4a3b;--text-muted:#6b7a6c;--text-dim:#a9b39b;
+  --red:#c2523b;--red-bg:#fdf0ed;--amber:#ba9661;--amber-bg:#fdf6ed;
+  --border:#ddd7cc;--border2:#ccc5b7;--white:#fff;
+  --shadow:rgba(14,27,15,0.07);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Montserrat',sans-serif;background:var(--cream);color:var(--text);min-height:100vh;}
+
+/* TOP BAR */
+.topbar{background:var(--green);padding:12px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.brand-logo{display:flex;align-items:center;gap:10px;}
+.leaf-mark{width:30px;height:30px;flex-shrink:0;}
+.brand-sub{font-size:8px;font-weight:500;color:var(--sage-light);letter-spacing:0.2em;text-transform:uppercase;margin-top:4px;}
+.privacy-pill{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 12px;font-size:10px;font-weight:500;color:rgba(255,255,255,0.9);letter-spacing:0.08em;text-transform:uppercase;}
+
+/* BREADCRUMB */
+.breadcrumb{display:flex;align-items:center;background:var(--white);border-bottom:1px solid var(--border);}
+.bc-step{display:flex;align-items:center;padding:10px 20px 10px 16px;font-size:11px;font-weight:500;color:var(--text-muted);cursor:pointer;transition:all 0.15s;position:relative;white-space:nowrap;}
+.bc-step.active{color:var(--green);font-weight:700;}
+.bc-step.done{color:var(--text-mid);}
+.bc-step.done:hover{color:var(--green);}
+.bc-step.locked{opacity:0.4;cursor:default;pointer-events:none;}
+.bc-step::after{content:'›';position:absolute;right:-4px;color:var(--border2);font-size:16px;z-index:1;}
+.bc-step:last-child::after{display:none;}
+.bc-num{width:20px;height:20px;border-radius:50%;background:var(--cream3);color:var(--text-muted);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-right:8px;flex-shrink:0;}
+.bc-step.active .bc-num{background:var(--green);color:#fff;}
+.bc-step.done .bc-num{background:var(--green-light);color:var(--green);}
+.bc-batch-pill{font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:2px 8px;border-radius:10px;margin-left:6px;}
+.bc-pill-ivf{background:var(--green-light);color:var(--green);}
+.bc-pill-ef{background:var(--amber-bg);color:var(--amber);}
+
+/* SCREENS */
+.screen{display:none;}.screen.active{display:block;}
+
+/* MAIN */
+.main{max-width:1080px;margin:0 auto;padding:32px 28px 80px;}
+
+/* PAGE HEADER */
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;gap:16px;flex-wrap:wrap;}
+.page-title{font-family:'Playfair Display',serif;font-size:30px;font-weight:300;font-style:italic;color:var(--text);line-height:1.1;}
+.page-subtitle{font-size:12px;color:var(--text-muted);margin-top:4px;}
+.page-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+
+/* BUTTONS */
+.btn{font-family:'Montserrat',sans-serif;font-size:12px;font-weight:600;padding:8px 20px;border-radius:8px;border:none;cursor:pointer;transition:all 0.15s;white-space:nowrap;letter-spacing:0.04em;}
+.btn-primary{background:var(--green);color:#fff;}.btn-primary:hover{background:var(--green-mid);}
+.btn-secondary{background:var(--white);color:var(--text-mid);border:1px solid var(--border2);}.btn-secondary:hover{border-color:var(--green);color:var(--green);}
+.btn-amber{background:var(--amber);color:#fff;}.btn-amber:hover{background:#a8844f;}
+.btn-sm{font-size:11px;padding:5px 14px;}
+.btn-ivf{background:var(--green);color:#fff;}.btn-ivf:hover{background:var(--green-mid);}
+.btn-ef{background:var(--amber);color:#fff;}.btn-ef:hover{background:#a8844f;}
+
+/* DROP ZONE */
+.drop-zone{border:2px dashed var(--border2);border-radius:16px;padding:48px 32px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--white);margin-bottom:12px;}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--green);background:var(--green-pale);}
+.drop-zone.drag-over{transform:scale(1.005);}
+.drop-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:400;color:var(--text);margin:10px 0 7px;}
+.drop-sub{font-size:13px;color:var(--text-muted);line-height:1.7;max-width:440px;margin:0 auto;}
+.file-input{display:none;}
+
+/* NOTICES */
+.notice{background:var(--green-pale);border:1px solid rgba(92,102,93,0.2);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--green);margin-bottom:28px;line-height:1.7;display:flex;gap:8px;align-items:flex-start;}
+.status-msg{padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:20px;display:none;line-height:1.6;}
+.status-msg.error{background:var(--red-bg);border:1px solid rgba(192,92,74,0.3);color:var(--red);}
+.status-msg.warn{background:var(--amber-bg);border:1px solid rgba(160,120,64,0.3);color:var(--amber);}
+.status-msg.ok{background:var(--green-light);border:1px solid rgba(92,102,93,0.2);color:var(--green);}
+
+/* MONTH NAV */
+.month-nav-bar{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--border);gap:16px;flex-wrap:wrap;}
+.month-display{font-family:'Playfair Display',serif;font-size:32px;font-weight:300;font-style:italic;color:var(--text);line-height:1;}
+.month-sub{font-size:12px;color:var(--text-muted);margin-top:4px;}
+.month-tab-row{display:flex;align-items:center;gap:6px;margin-top:12px;flex-wrap:wrap;}
+.nav-arrow{width:30px;height:30px;border-radius:7px;border:1px solid var(--border2);background:var(--white);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:all 0.15s;}
+.nav-arrow:hover:not(:disabled){border-color:var(--green);color:var(--green);}
+.nav-arrow:disabled{opacity:0.3;cursor:default;}
+.month-tabs{display:flex;gap:5px;flex-wrap:wrap;}
+.month-tab{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:500;padding:5px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--white);color:var(--text-muted);cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.month-tab:hover{border-color:var(--green);color:var(--green);}
+.month-tab.active{background:var(--green);border-color:var(--green);color:#fff;}
+.file-info{font-size:11px;color:var(--text-muted);line-height:1.8;text-align:right;flex-shrink:0;}
+
+/* BATCH CARDS */
+.cards-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.batch-card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:22px;box-shadow:0 2px 8px var(--shadow);position:relative;overflow:hidden;}
+.batch-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.batch-card.ivf::before{background:linear-gradient(90deg,var(--green),var(--sage));}
+.batch-card.ef::before{background:linear-gradient(90deg,var(--amber),#c9986a);}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.card-title-wrap{display:flex;align-items:center;gap:8px;}
+.card-pill{font-size:9px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;padding:3px 9px;border-radius:20px;}
+.pill-ivf{background:var(--green-light);color:var(--green);}
+.pill-ef{background:var(--amber-bg);color:var(--amber);}
+.card-title{font-size:11px;font-weight:500;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;}
+.card-total{font-size:12px;color:var(--text-dim);}
+.stat-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.stat-box{border-radius:9px;padding:12px;border:1px solid transparent;}
+.cleared-box{background:var(--green-pale);border-color:rgba(92,102,93,0.15);}
+.pending-box{background:var(--red-bg);border-color:rgba(192,92,74,0.15);}
+.stat-label{font-size:9px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;}
+.stat-num{font-family:'Playfair Display',serif;font-size:38px;font-weight:600;line-height:1;margin-bottom:2px;}
+.stat-num.green{color:var(--green);}.stat-num.red{color:var(--red);}
+.stat-pct{font-size:11px;color:var(--text-muted);}
+.progress-meta{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-muted);margin-bottom:5px;}
+.target-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;}
+.badge-under{background:var(--cream2);color:var(--text-mid);}
+.badge-near{background:var(--amber-bg);color:var(--amber);}
+.badge-at{background:var(--green-light);color:var(--green);}
+.progress-bar{height:5px;background:var(--cream3);border-radius:3px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:3px;transition:width 0.7s cubic-bezier(0.16,1,0.3,1);}
+.fill-ivf{background:linear-gradient(90deg,var(--green),var(--sage));}
+.fill-ef{background:linear-gradient(90deg,var(--amber),#c9986a);}
+.plan-batch-btn-row{display:flex;gap:8px;margin-top:14px;}
+
+/* SECTION CARD */
+.section-card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:22px;box-shadow:0 2px 8px var(--shadow);margin-bottom:14px;}
+.section-title{font-size:10px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);margin-bottom:18px;}
+
+/* PROVIDER */
+.provider-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.provider-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.provider-card{background:var(--cream);border:2px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all 0.15s;}
+.provider-card:hover{border-color:var(--green);background:var(--green-pale);}
+.provider-card.active{border-color:var(--green);background:var(--green-light);box-shadow:0 0 0 2px rgba(92,102,93,0.12);}
+.provider-name{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text);margin-bottom:12px;}
+.prov-batch-row{margin-bottom:8px;}.prov-batch-row:last-child{margin-bottom:0;}
+.prov-batch-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.prov-label-ivf{font-weight:700;color:var(--green);font-size:10px;letter-spacing:0.06em;text-transform:uppercase;}
+.prov-label-ef{font-weight:700;color:var(--amber);font-size:10px;letter-spacing:0.06em;text-transform:uppercase;}
+.prov-counts{display:flex;align-items:baseline;gap:2px;}
+.prov-cleared-ivf{font-weight:700;color:var(--green);font-size:14px;}
+.prov-cleared-ef{font-weight:700;color:var(--amber);font-size:14px;}
+.prov-sep{color:var(--text-dim);font-size:11px;}
+.prov-total{color:var(--text-muted);font-size:11px;}
+.prov-pct{font-size:10px;font-weight:600;color:var(--text-muted);margin-left:4px;}
+.prov-bar{height:3px;background:var(--cream3);border-radius:2px;overflow:hidden;margin-top:3px;}
+.prov-bar-fill{height:100%;border-radius:2px;transition:width 0.5s;}
+.prov-bar-fill.ivf{background:var(--green);}.prov-bar-fill.ef{background:var(--amber);}
+.prov-all-wrap{display:flex;align-items:center;gap:8px;}
+.prov-all-btn{font-family:'Montserrat',sans-serif;font-size:10px;font-weight:600;padding:4px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--white);color:var(--text-muted);cursor:pointer;transition:all 0.15s;letter-spacing:0.06em;text-transform:uppercase;}
+.prov-all-btn.active{background:var(--green);border-color:var(--green);color:#fff;}
+.prov-all-btn:hover:not(.active){border-color:var(--green);color:var(--green);}
+.prov-filter-label{font-size:11px;color:var(--text-muted);}
+
+/* OVERVIEW TABLE */
+.table-header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+.table-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.filter-row{display:flex;gap:5px;flex-wrap:wrap;}
+.filter-btn{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:500;padding:4px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--cream);color:var(--text-muted);cursor:pointer;transition:all 0.15s;}
+.filter-btn.active{background:var(--green);border-color:var(--green);color:#fff;}
+.filter-btn:hover:not(.active){border-color:var(--green);color:var(--green);}
+.row-count{font-size:12px;color:var(--text-dim);}
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{padding:9px 12px;text-align:left;font-size:9px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);background:var(--cream);border-bottom:1px solid var(--border);white-space:nowrap;}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+tbody tr:last-child{border-bottom:none;}tbody tr:hover{background:var(--green-pale);}
+tbody td{padding:10px 12px;color:var(--text);white-space:nowrap;}
+.td-name{font-weight:600;color:var(--text);}
+.td-treat{max-width:200px;overflow:hidden;text-overflow:ellipsis;color:var(--text-mid);font-size:12px;}
+.td-date{color:var(--text-muted);font-size:12px;}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;}
+.b-cleared{background:var(--green-light);color:var(--green);}
+.b-pending{background:var(--red-bg);color:var(--red);}
+.b-ivf{background:var(--green-light);color:var(--green-mid);}
+.b-ef{background:var(--amber-bg);color:var(--amber);}
+.no-rows{text-align:center;color:var(--text-muted);padding:28px;font-size:13px;}
+.remove-btn{background:none;border:none;cursor:pointer;font-size:15px;color:var(--text-dim);padding:2px 6px;border-radius:4px;line-height:1;transition:all 0.1s;}
+.remove-btn:hover{color:var(--red);background:var(--red-bg);}
+.remove-btn.restore{color:var(--green);}
+.remove-btn.restore:hover{background:var(--green-light);color:var(--green);}
+.over-cap{border-color:var(--red)!important;}
+.over-cap .cal-col-header{background:var(--red-bg)!important;}
+.over-cap .cal-col-count{color:var(--red)!important;font-weight:700;}
+
+/* SCREEN 2: PLANNER */
+.plan-table-wrap{overflow-x:auto;}
+.plan-table{width:100%;border-collapse:collapse;font-size:13px;}
+.plan-table thead th{padding:9px 14px;text-align:left;font-size:9px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);background:var(--cream);border-bottom:1px solid var(--border);white-space:nowrap;}
+.plan-table tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+.plan-table tbody tr:last-child{border-bottom:none;}
+.plan-table tbody td{padding:10px 14px;color:var(--text);}
+.plan-table tbody tr:hover{background:var(--green-pale);}
+.plan-group-hdr{background:var(--cream2);font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);padding:7px 14px;border-bottom:1px solid var(--border);}
+.stim-input{width:70px;padding:5px 8px;border:1px solid var(--border2);border-radius:6px;font-family:'Montserrat',sans-serif;font-size:13px;text-align:center;transition:all 0.15s;}
+.stim-input:focus{outline:none;border-color:var(--green);background:var(--green-pale);}
+.plan-footer{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap;}
+.save-indicator{font-size:11px;color:var(--green);font-weight:600;}
+
+/* SCREEN 3: CALENDAR */
+.cal-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+.cal-total-chip{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:12px 20px;display:flex;align-items:baseline;gap:8px;}
+.cal-total-val{font-family:'Playfair Display',serif;font-size:28px;font-weight:600;color:var(--green);}
+.cal-total-denom{font-family:'Playfair Display',serif;font-size:20px;color:var(--text-muted);}
+.cal-total-label{font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-left:2px;}
+.cal-legend{display:flex;gap:12px;align-items:center;font-size:11px;color:var(--text-muted);}
+.leg-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:3px;}
+.leg-ivf{background:var(--green);}.leg-ef{background:var(--amber);}
+
+/* Calendar grid — 5 equal columns always */
+.cal-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:start;margin-bottom:20px;}
+.cal-col{background:var(--white);border:2px solid var(--border);border-radius:12px;overflow:hidden;min-height:160px;transition:border-color 0.15s;}
+.cal-col.drag-over{border-color:var(--green);background:var(--green-pale);}
+.cal-col-header{padding:10px 12px;background:var(--cream);border-bottom:1px solid var(--border);text-align:center;}
+.cal-col-day{font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);}
+.cal-col-count{font-size:11px;color:var(--text-dim);margin-top:2px;}
+.cal-col.heavy .cal-col-header{background:var(--amber-bg);}
+.cal-col.heavy .cal-col-count{color:var(--amber);font-weight:700;}
+.cal-patients{padding:8px;min-height:80px;}
+
+/* Chips — draggable */
+.chip{border-radius:7px;padding:7px 9px;margin-bottom:5px;font-size:12px;cursor:grab;transition:opacity 0.15s,box-shadow 0.15s;user-select:none;position:relative;}
+.chip:last-child{margin-bottom:0;}
+.chip:hover{box-shadow:0 3px 10px rgba(0,0,0,0.12);}
+.chip.dragging{opacity:0.4;cursor:grabbing;}
+.chip-ivf{background:var(--green-light);border-left:3px solid var(--green);}
+.chip-ef{background:var(--amber-bg);border-left:3px solid var(--amber);}
+.chip-name{font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;}
+.chip-meta{font-size:10px;color:var(--text-muted);margin-top:1px;}
+.cal-empty{color:var(--text-dim);font-size:12px;text-align:center;padding:24px 8px;pointer-events:none;}
+
+/* Unscheduled pool */
+.unscheduled-pool{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;}
+.pool-label{font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;}
+.pool-chips{display:flex;flex-wrap:wrap;gap:6px;min-height:40px;padding:6px;border:2px dashed var(--border2);border-radius:8px;transition:border-color 0.15s;}
+.pool-chips.drag-over{border-color:var(--green);background:var(--green-pale);}
+
+/* ANIMATIONS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.anim{animation:fadeUp 0.3s ease both;}
+.d1{animation-delay:0.03s;}.d2{animation-delay:0.07s;}.d3{animation-delay:0.11s;}.d4{animation-delay:0.15s;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand-logo">
+    <div>
+      <span style="color:#c2523b;font-family:'Playfair Display',serif;font-size:20px;font-weight:700;line-height:1;display:block;letter-spacing:0.01em">Terra</span>
+      <span style="color:rgba(255,255,255,0.92);font-family:'Montserrat',sans-serif;font-size:8px;font-weight:600;letter-spacing:0.28em;text-transform:uppercase;display:block;margin-top:1px">FERTILITY</span>
+      <div class="brand-sub">Cycle Board Tracker</div>
+    </div>
+  </div>
+  <div class="privacy-pill">&#128274; Local Only</div>
+</div>
+
+<nav class="breadcrumb" id="breadcrumb">
+  <div class="bc-step active" id="bc0" data-screen="0"><div class="bc-num">1</div>Overview</div>
+  <div class="bc-step locked" id="bc1" data-screen="1"><div class="bc-num">2</div>Plan Batch</div>
+  <div class="bc-step locked" id="bc2" data-screen="2"><div class="bc-num">3</div>Calendar</div>
+</nav>
+
+<div class="main">
+<div class="status-msg" id="statusMsg"></div>
+
+<!-- SCREEN 1: OVERVIEW -->
+<div class="screen active" id="screen0">
+  <div class="drop-zone" id="dropZone">
+    <svg width="40" height="40" viewBox="0 0 44 44" fill="none">
+      <rect x="7" y="11" width="30" height="24" rx="3" stroke="#a9b39b" stroke-width="1.5" fill="none"/>
+      <path d="M15 11V9C15 8 15.9 7 17 7H27C28.1 7 29 8 29 9V11" stroke="#a9b39b" stroke-width="1.5"/>
+      <path d="M22 18V30M22 18L18 22M22 18L26 22" stroke="#5c665d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="drop-title">Drop Cycle Board CSV here</div>
+    <div class="drop-sub">Export from the EMR and drag here. Grouped by Planned Start Date.</div>
+    <label class="btn btn-primary" style="margin-top:16px;display:inline-block" for="fileInput">Choose file</label>
+    <input type="file" id="fileInput" class="file-input" accept=".csv,text/csv">
+  </div>
+  <div class="notice">
+    <span style="flex-shrink:0">&#128274;</span>
+    <span><strong>Local only:</strong> All processing happens in your browser. Patient names shown for internal clinical use. Close tab to clear.</span>
+  </div>
+  <div id="dashboardContent" style="display:none">
+    <div class="month-nav-bar anim">
+      <div>
+        <div class="month-display" id="monthDisplay">&mdash;</div>
+        <div class="month-sub" id="monthSub"></div>
+        <div class="month-tab-row">
+          <button class="nav-arrow" id="prevMonth" disabled>&#8249;</button>
+          <div class="month-tabs" id="monthTabs"></div>
+          <button class="nav-arrow" id="nextMonth" disabled>&#8250;</button>
+        </div>
+      </div>
+      <div class="file-info" id="fileInfo"></div>
+    </div>
+    <div id="monthContent"></div>
+  </div>
+</div>
+
+<!-- SCREEN 2: PLAN BATCH -->
+<div class="screen" id="screen1">
+  <div class="page-header">
+    <div>
+      <div class="page-title" id="planTitle">Plan Batch</div>
+      <div class="page-subtitle" id="planSubtitle">Cleared patients only &mdash; adjust stim days per patient, then view the retrieval calendar.</div>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn-secondary btn-sm" onclick="goToScreen(0)">&#8592; Overview</button>
+      <button class="btn btn-amber btn-sm" id="planToCalBtn" onclick="goToCalFromPlan()">View Calendar &#8594;</button>
+    </div>
+  </div>
+  <div id="planContent"></div>
+</div>
+
+<!-- SCREEN 3: CALENDAR -->
+<div class="screen" id="screen2">
+  <div class="page-header">
+    <div>
+      <div class="page-title" id="calTitle">Retrieval Calendar</div>
+      <div class="page-subtitle">Drag patients between days to balance the retrieval load. Changes save automatically.</div>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn-secondary btn-sm" onclick="goToScreen(1);renderPlanScreen()">&#8592; Plan Batch</button>
+    </div>
+  </div>
+  <div id="calContent"></div>
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// CONFIG & STATE
+// ═══════════════════════════════════════════════
+const TARGETS   = { ivf:35, ef:15 };
+const PROVIDERS = ['Pietro','Denis','Emily'];
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAY_FULL  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+let allMonthData          = null;
+let currentMonthIdx       = 0;
+let currentBatchFilter    = 'all';
+let currentBillingFilter  = 'all';
+let currentProviderFilter = 'all';
+let currentScreen         = 0;
+let planBatchType         = 'ivf';  // which batch type is being planned
+
+// planData[monthKey][patientIdx] = { stimDays }
+let planData = {};
+
+// calAssignments[monthKey+batchType][patientIdx] = dayIndex (0=Mon..4=Fri) or null (unscheduled)
+let calAssignments = {};
+
+// removedPatients[monthKey] = Set of globalIdx integers removed by user on page 1
+let removedPatients = {};
+
+// calWeekStart/End[calKey] = ISO date strings for the user-chosen VOR date range
+let calWeekStart = {};
+let calWeekEnd   = {};
+
+// ═══════════════════════════════════════════════
+// NAME PARSING
+// ═══════════════════════════════════════════════
+function cleanPatientName(raw) {
+  if (!raw || !raw.trim()) return null;
+  // Strip HTML tags (EMR may embed anchor markup)
+  let s = raw.replace(/<[^>]+>/g, '');
+  // Reject URLs — NTH EMR "Pt Link" exports the href, not the display text
+  const trimmed = s.trim();
+  if (trimmed.match(/^https?:\/\//i) || trimmed.includes('://') || trimmed.match(/^\/\w+\/\w+/)) return null;
+  // Reject cells that are purely numeric (IDs, MRNs)
+  if (trimmed.match(/^\d+$/)) return null;
+  // Strip quoted nicknames "Allie" and parentheticals (notes)
+  s = s.replace(/"[^"]*"/g, '').replace(/\([^)]*\)/g, '');
+  s = s.replace(/\s+/g, ' ').trim();
+  if (!s || s.length < 2) return null;
+  const toProper = x => x.trim().split(/\s+/).map(w => w ? w[0].toUpperCase()+w.slice(1).toLowerCase() : '').join(' ');
+  if (s.includes(',')) {
+    const ci = s.indexOf(',');
+    const last  = s.slice(0, ci).trim();
+    const first = s.slice(ci+1).trim();
+    if (!first && !last) return null;
+    if (!first) return toProper(last);
+    if (!last)  return toProper(first);
+    return toProper(first) + ' ' + toProper(last);
+  }
+  // Reject if it still looks like a URL fragment or path
+  if (s.match(/[\/=&?%]/) || s.match(/\.(com|org|net|io|app|html|php)\b/i)) return null;
+  return toProper(s);
+}
+
+// ═══════════════════════════════════════════════
+// CSV PARSING
+// ═══════════════════════════════════════════════
+function parseCSVLine(line) {
+  const r=[]; let cur='', inQ=false;
+  for (let i=0;i<line.length;i++) {
+    const ch=line[i];
+    if (ch==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+    else if(ch===','&&!inQ){r.push(cur.trim());cur='';}
+    else cur+=ch;
+  }
+  r.push(cur.trim()); return r;
+}
+function cell(cells,idx){if(idx<0||idx>=cells.length)return '';return(cells[idx]??'').trim();}
+function findCol(h,...cands){for(const c of cands){const i=h.findIndex(x=>x.includes(c));if(i!==-1)return i;}return -1;}
+
+// ═══════════════════════════════════════════════
+// DATE HELPERS
+// ═══════════════════════════════════════════════
+function parsePlannedMonth(ds) {
+  if (!ds||!ds.trim()) return null;
+  let m=ds.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m) return `${m[3]}-${m[1].padStart(2,'0')}`;
+  m=ds.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return `${m[1]}-${m[2]}`;
+  m=ds.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+  if(m) return parseInt(m[1])>12?`${m[3]}-${m[2].padStart(2,'0')}`:`${m[3]}-${m[1].padStart(2,'0')}`;
+  return null;
+}
+function monthKeyToLabel(k){if(k==='unknown')return 'Unknown Date';const[y,mo]=k.split('-');return new Date(+y,+mo-1,1).toLocaleString('default',{month:'long',year:'numeric'});}
+function monthKeyToShort(k){if(k==='unknown')return 'Unknown Date';const[y,mo]=k.split('-');return new Date(+y,+mo-1,1).toLocaleString('default',{month:'short'})+"'"+y.slice(2);}
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+function fmtShortDate(d){if(!d)return '';return d.toLocaleString('default',{month:'short',day:'numeric'});}
+
+// First Monday of a given month key
+function firstMondayOf(mk) {
+  if(mk==='unknown') return new Date();
+  const[y,mo]=mk.split('-');
+  const d=new Date(+y,+mo-1,1);
+  // day: 0=Sun,1=Mon...6=Sat
+  const dow=d.getDay();
+  const offset=(dow===0)?1:(dow===1)?0:(8-dow);
+  return addDays(d,offset);
+}
+
+// ═══════════════════════════════════════════════
+// CLASSIFICATION
+// ═══════════════════════════════════════════════
+function classifyTreatment(raw) {
+  if(!raw) return 'other'; const t=raw.toLowerCase();
+  if(t.includes('egg freez')||t.includes('egg banking')||t.includes('oocyte')||t.includes('egg bank')) return 'ef';
+  if(t.includes('fresh et')||t.includes('fresh ivf')) return 'ivf';
+  if((t.includes('cryo')||t.includes('freeze'))&&t.includes('pgt')) return 'ivf';
+  if(t.includes('freeze all')) return 'ef';
+  if(t.includes('pgt')||t.includes('ivf')) return 'ivf';
+  return 'other';
+}
+function getBilling(raw){return(raw||'').trim().toLowerCase()==='cleared'?'cleared':'pending';}
+function normalizeProvider(raw){
+  if(!raw)return 'Unknown';const r=raw.toLowerCase();
+  if(r.includes('bortoletto')||r.includes('pietro'))return 'Pietro';
+  if(r.includes('vaughan')||r.includes('denis'))return 'Denis';
+  if(r.includes('seidler')||r.includes('emily'))return 'Emily';
+  return raw.trim()||'Unknown';
+}
+
+// ═══════════════════════════════════════════════
+// PARSE CSV
+// ═══════════════════════════════════════════════
+function parseCSV(text) {
+  const lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim()&&!l.match(/^[,\s]+$/));
+  if(lines.length<2) throw new Error('CSV has no data rows.');
+  const rawH=parseCSVLine(lines[0]);
+  if(rawH.length<2) throw new Error('Header has fewer than 2 columns. Ensure file is comma-separated CSV.');
+  const h=rawH.map(x=>x.toLowerCase().replace(/[^a-z0-9]/g,''));
+
+  // Column detection — explicit first/last preferred over combined
+  const cols={
+    first:    findCol(h,'firstname','firstnm','ptfirst','givenname','fname'),
+    last:     findCol(h,'lastname','lastnm','ptlast','surname','familyname','lname'),
+    name:     findCol(h,'ptlink','ptname','patient','patientname','name','link'),
+    mrn:      findCol(h,'mrn','medicalrecord','patientid','chartnum','chart','id'),
+    provider: findCol(h,'cycleprovider','provider','physician','maindoc','doctor','attending'),
+    billing:  findCol(h,'billingstatus','billing','financialstatus','billingstat','clearancestatus'),
+    treatment:findCol(h,'treatmenttype','treatment','cycletype','type'),
+    planned:  findCol(h,'plannedstartdate','plannedstart','planned','startdate','cyclestart'),
+    created:  findCol(h,'cyclecreationdate','creationdate','cyclecreation','created'),
+  };
+
+  const miss=[];
+  if(cols.planned<0)miss.push('Planned Start Date');
+  if(cols.billing<0)miss.push('Billing Status');
+  if(cols.treatment<0)miss.push('Treatment Type');
+  if(cols.provider<0)miss.push('Provider');
+  if(miss.length)showStatus(`Warning: missing column(s): ${miss.join(', ')}. Headers detected: ${rawH.join(' | ')}`,'warn');
+
+  const rows=[]; let unparsed=0;
+  for(let i=1;i<lines.length;i++){
+    const cells=parseCSVLine(lines[i]);
+    if(cells.filter(c=>c.trim()).length<2)continue;
+
+    // Build name — try explicit cols first, then combined, then MRN fallback
+    let patientName;
+    if(cols.first>=0&&cols.last>=0){
+      const f=cell(cells,cols.first), l=cell(cells,cols.last);
+      const toP=s=>s.trim().split(/\s+/).map(w=>w?w[0].toUpperCase()+w.slice(1).toLowerCase():'').join(' ');
+      const full=(toP(f)+' '+toP(l)).trim();
+      patientName=full||null;
+    }
+    if(!patientName){
+      patientName=cleanPatientName(cell(cells,cols.name));
+    }
+    if(!patientName){
+      // Last resort: use MRN as identifier
+      const mrn=cell(cells,cols.mrn);
+      patientName=mrn?`Patient #${mrn}`:null;
+    }
+    if(!patientName) continue; // no identifiable name — skip this row entirely
+
+    const plannedRaw=cell(cells,cols.planned);
+    const monthKey=parsePlannedMonth(plannedRaw);
+    if(!monthKey) unparsed++;
+    const treatRaw=cell(cells,cols.treatment);
+    const batch=classifyTreatment(treatRaw);
+
+    rows.push({
+      patientName,
+      provider:  normalizeProvider(cell(cells,cols.provider)),
+      billing:   getBilling(cell(cells,cols.billing)),
+      treatment: treatRaw,
+      batch,
+      created:   cell(cells,cols.created),
+      monthKey:  monthKey||'unknown',
+    });
+  }
+
+  if(rows.length===0) throw new Error('No data rows found. Check that the file is a valid CSV with content rows.');
+  if(unparsed>0) showStatus(`${unparsed} row(s) had unrecognizable Planned Start Date — placed in "Unknown Date" tab.`,'warn');
+  return rows;
+}
+
+// ═══════════════════════════════════════════════
+// GROUP BY MONTH
+// ═══════════════════════════════════════════════
+function groupByMonth(rows){
+  const now=new Date();const allowed=new Set();
+  // Include current month (i=0) through 6 months ahead (i=6)
+  for(let i=0;i<=6;i++){const d=new Date(now.getFullYear(),now.getMonth()+i,1);allowed.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);}
+  allowed.add('unknown');
+  const byMonth={};
+  for(const r of rows){if(!allowed.has(r.monthKey))continue;if(!byMonth[r.monthKey])byMonth[r.monthKey]=[];byMonth[r.monthKey].push(r);}
+  const sortedKeys=Object.keys(byMonth).sort((a,b)=>{if(a==='unknown')return 1;if(b==='unknown')return -1;return a.localeCompare(b);});
+  return{sortedKeys,byMonth};
+}
+
+// ═══════════════════════════════════════════════
+// AGGREGATE
+// ═══════════════════════════════════════════════
+function aggregate(rows){
+  const make=()=>({cleared:0,pending:0,byProvider:{}});
+  const agg={ivf:make(),ef:make()};
+  for(const r of rows){
+    if(r.batch!=='ivf'&&r.batch!=='ef')continue;
+    const b=agg[r.batch];b[r.billing]++;
+    if(!b.byProvider[r.provider])b.byProvider[r.provider]={cleared:0,pending:0};
+    b.byProvider[r.provider][r.billing]++;
+  }
+  return agg;
+}
+
+// ═══════════════════════════════════════════════
+// SCREEN 1 — OVERVIEW RENDER
+// ═══════════════════════════════════════════════
+function renderMonthTabs(){
+  const{sortedKeys}=allMonthData;
+  document.getElementById('monthTabs').innerHTML=sortedKeys.map((k,i)=>`<button class="month-tab${i===currentMonthIdx?' active':''}" data-idx="${i}" title="${monthKeyToLabel(k)}">${monthKeyToShort(k)}</button>`).join('');
+  document.getElementById('prevMonth').disabled=currentMonthIdx===0;
+  document.getElementById('nextMonth').disabled=currentMonthIdx===sortedKeys.length-1;
+}
+
+function targetBadge(c,t){
+  const p=t>0?Math.round(c/t*100):0;
+  if(c>=t) return `<span class="target-badge badge-at">&#10003; ${c}/${t}</span>`;
+  if(p>=75) return `<span class="target-badge badge-near">${c}/${t} &middot; ${t-c} to go</span>`;
+  return `<span class="target-badge badge-under">${c}/${t} &middot; ${t-c} to go</span>`;
+}
+
+function provCardHTML(name,ivf,ef,active){
+  const ivfT=ivf.cleared+ivf.pending,efT=ef.cleared+ef.pending;
+  const ivfPct=ivfT>0?Math.round(ivf.cleared/ivfT*100):0;
+  const efPct=efT>0?Math.round(ef.cleared/efT*100):0;
+  return `<div class="provider-card${active?' active':''}" data-provider="${name}">
+    <div class="provider-name">${name}</div>
+    <div class="prov-batch-row">
+      <div class="prov-batch-top"><span class="prov-label-ivf">IVF</span>
+        <div class="prov-counts"><span class="prov-cleared-ivf">${ivf.cleared}</span><span class="prov-sep">/</span><span class="prov-total">${ivfT}</span><span class="prov-pct">${ivfPct}%</span></div>
+      </div><div class="prov-bar"><div class="prov-bar-fill ivf" style="width:${Math.min(100,ivfPct)}%"></div></div>
+    </div>
+    <div class="prov-batch-row">
+      <div class="prov-batch-top"><span class="prov-label-ef">Eggs</span>
+        <div class="prov-counts"><span class="prov-cleared-ef">${ef.cleared}</span><span class="prov-sep">/</span><span class="prov-total">${efT}</span><span class="prov-pct">${efPct}%</span></div>
+      </div><div class="prov-bar"><div class="prov-bar-fill ef" style="width:${Math.min(100,efPct)}%"></div></div>
+    </div>
+  </div>`;
+}
+
+function buildMonthHTML(agg){
+  const ivfT=agg.ivf.cleared+agg.ivf.pending,efT=agg.ef.cleared+agg.ef.pending;
+  const ivfPct=ivfT>0?Math.round(agg.ivf.cleared/ivfT*100):0;
+  const efPct=efT>0?Math.round(agg.ef.cleared/efT*100):0;
+  const ivfBar=Math.min(100,TARGETS.ivf>0?Math.round(agg.ivf.cleared/TARGETS.ivf*100):0);
+  const efBar=Math.min(100,TARGETS.ef>0?Math.round(agg.ef.cleared/TARGETS.ef*100):0);
+  const allActive=currentProviderFilter==='all';
+  const provHTML=PROVIDERS.map(n=>provCardHTML(n,agg.ivf.byProvider[n]||{cleared:0,pending:0},agg.ef.byProvider[n]||{cleared:0,pending:0},currentProviderFilter===n)).join('');
+  const bfC=f=>currentBatchFilter===f?' active':'';
+  const bilC=f=>currentBillingFilter===f?' active':'';
+
+  return `
+  <div class="cards-row">
+    <div class="batch-card ivf anim d1">
+      <div class="card-header"><div class="card-title-wrap"><span class="card-pill pill-ivf">IVF</span><span class="card-title">Main Batch</span></div><span class="card-total">${ivfT} total</span></div>
+      <div class="stat-pair">
+        <div class="stat-box cleared-box"><div class="stat-label">Cleared</div><div class="stat-num green">${agg.ivf.cleared}</div><div class="stat-pct">${ivfPct}%</div></div>
+        <div class="stat-box pending-box"><div class="stat-label">Not Cleared</div><div class="stat-num red">${agg.ivf.pending}</div><div class="stat-pct">${100-ivfPct}%</div></div>
+      </div>
+      <div class="progress-meta"><span>Target</span>${targetBadge(agg.ivf.cleared,TARGETS.ivf)}</div>
+      <div class="progress-bar"><div class="progress-fill fill-ivf" style="width:${ivfBar}%"></div></div>
+      <div class="plan-batch-btn-row">
+        <button class="btn btn-ivf btn-sm" onclick="enterPlan('ivf')">Plan IVF Batch &#8594;</button>
+      </div>
+    </div>
+    <div class="batch-card ef anim d2">
+      <div class="card-header"><div class="card-title-wrap"><span class="card-pill pill-ef">Eggs</span><span class="card-title">Eggs Minibatch</span></div><span class="card-total">${efT} total</span></div>
+      <div class="stat-pair">
+        <div class="stat-box cleared-box"><div class="stat-label">Cleared</div><div class="stat-num green">${agg.ef.cleared}</div><div class="stat-pct">${efPct}%</div></div>
+        <div class="stat-box pending-box"><div class="stat-label">Not Cleared</div><div class="stat-num red">${agg.ef.pending}</div><div class="stat-pct">${100-efPct}%</div></div>
+      </div>
+      <div class="progress-meta"><span>Target</span>${targetBadge(agg.ef.cleared,TARGETS.ef)}</div>
+      <div class="progress-bar"><div class="progress-fill fill-ef" style="width:${efBar}%"></div></div>
+      <div class="plan-batch-btn-row">
+        <button class="btn btn-ef btn-sm" onclick="enterPlan('ef')">Plan Eggs Batch &#8594;</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card anim d3">
+    <div class="provider-section-header">
+      <div class="section-title" style="margin:0">By Provider <span style="font-weight:400;color:var(--text-dim);font-size:9px">&#x2022; click to filter</span></div>
+      <div class="prov-all-wrap">
+        <span class="prov-filter-label" id="provFilterLabel" style="display:${allActive?'none':'inline'}">Filtering: <strong>${currentProviderFilter}</strong></span>
+        <button class="prov-all-btn${allActive?' active':''}" id="provAllBtn">All Providers</button>
+      </div>
+    </div>
+    <div class="provider-grid" id="providerGrid">${provHTML}</div>
+  </div>
+
+  <div class="section-card anim d4">
+    <div class="table-header-row">
+      <div class="table-left">
+        <div class="section-title" style="margin:0">Cycle List</div>
+        <span class="row-count" id="rowCount"></span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+        <div class="filter-row" id="filterRow">
+          <span style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-dim);margin-right:4px;align-self:center;">Batch</span>
+          <button class="filter-btn${bfC('all')}"  data-filter="all"  data-group="batch">All</button>
+          <button class="filter-btn${bfC('ivf')}"  data-filter="ivf"  data-group="batch">IVF</button>
+          <button class="filter-btn${bfC('ef')}"   data-filter="ef"   data-group="batch">Eggs</button>
+        </div>
+        <div class="filter-row" id="billingRow">
+          <span style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-dim);margin-right:4px;align-self:center;">Status</span>
+          <button class="filter-btn${bilC('all')}"     data-filter="all"     data-group="billing">All</button>
+          <button class="filter-btn${bilC('cleared')}" data-filter="cleared" data-group="billing">Cleared</button>
+          <button class="filter-btn${bilC('pending')}" data-filter="pending" data-group="billing">Not Cleared</button>
+        </div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table><thead><tr>
+        <th>Patient Name</th><th>Provider</th><th>Batch</th><th>Treatment</th><th>Billing Status</th><th>Cycle Created</th><th style="width:36px"></th>
+      </tr></thead><tbody id="tableBody"></tbody></table>
+    </div>
+  </div>`;
+}
+
+function renderTable(monthRows){
+  const mk=planKey();
+  const removed=removedPatients[mk]||new Set();
+  const rows=monthRows.map((r,i)=>({...r,globalIdx:i})).filter(r=>{
+    if(r.batch!=='ivf'&&r.batch!=='ef')return false;
+    if(currentProviderFilter!=='all'&&r.provider!==currentProviderFilter)return false;
+    if(currentBatchFilter==='ivf'&&r.batch!=='ivf')return false;
+    if(currentBatchFilter==='ef'&&r.batch!=='ef')return false;
+    if(currentBillingFilter==='cleared'&&r.billing!=='cleared')return false;
+    if(currentBillingFilter==='pending'&&r.billing!=='pending')return false;
+    return true;
+  });
+  const rc=document.getElementById('rowCount');if(rc)rc.textContent=`${rows.length} row${rows.length!==1?'s':''}${removed.size>0?' · '+removed.size+' removed':''}`;
+  const bBatch=b=>b==='ivf'?'<span class="badge b-ivf">IVF</span>':'<span class="badge b-ef">Eggs</span>';
+  const bBill=b=>b==='cleared'?'<span class="badge b-cleared">Cleared</span>':'<span class="badge b-pending">Not Cleared</span>';
+  const tb=document.getElementById('tableBody');if(!tb)return;
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="7" class="no-rows">No rows match this filter</td></tr>`;return;}
+  tb.innerHTML=rows.map(r=>{
+    const isRemoved=removed.has(r.globalIdx);
+    const rowStyle=isRemoved?'opacity:0.4;text-decoration:line-through;':'';
+    const btn=isRemoved
+      ?`<button class="remove-btn restore" data-idx="${r.globalIdx}" title="Restore patient">↩</button>`
+      :`<button class="remove-btn" data-idx="${r.globalIdx}" title="Remove from batch">×</button>`;
+    return `<tr style="${rowStyle}"><td class="td-name">${r.patientName}</td><td>${r.provider}</td><td>${bBatch(r.batch)}</td><td class="td-treat" title="${r.treatment}">${r.treatment||'&mdash;'}</td><td>${bBill(r.billing)}</td><td class="td-date">${r.created||'&mdash;'}</td><td>${btn}</td></tr>`;
+  }).join('');
+  tb.querySelectorAll('.remove-btn').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const idx=parseInt(btn.dataset.idx);
+      if(!removedPatients[mk])removedPatients[mk]=new Set();
+      if(btn.classList.contains('restore')){
+        removedPatients[mk].delete(idx);
+      } else {
+        removedPatients[mk].add(idx);
+        const ckIvf=mk+'::ivf',ckEf=mk+'::ef';
+        if(calAssignments[ckIvf])delete calAssignments[ckIvf][idx];
+        if(calAssignments[ckEf])delete calAssignments[ckEf][idx];
+      }
+      renderTable(monthRows);
+    });
+  });
+}
+
+function renderCurrentMonth(){
+  const{sortedKeys,byMonth}=allMonthData;
+  const key=sortedKeys[currentMonthIdx];
+  const rows=byMonth[key];
+  const ivfEfCount=rows.filter(r=>r.batch==='ivf'||r.batch==='ef').length;
+  document.getElementById('monthDisplay').textContent=monthKeyToLabel(key);
+  document.getElementById('monthSub').textContent=`${ivfEfCount} IVF/EF cycle${ivfEfCount!==1?'s':''} in this batch`;
+  const content=document.getElementById('monthContent');
+  content.innerHTML=buildMonthHTML(aggregate(rows));
+  content.querySelectorAll('.anim').forEach(el=>{el.style.animation='none';void el.offsetHeight;el.style.animation='';});
+  document.getElementById('providerGrid').addEventListener('click',e=>{
+    const card=e.target.closest('.provider-card');if(!card)return;
+    currentProviderFilter=(currentProviderFilter===card.dataset.provider)?'all':card.dataset.provider;
+    updateProviderUI(rows);renderTable(rows);
+  });
+  document.getElementById('provAllBtn').addEventListener('click',()=>{currentProviderFilter='all';updateProviderUI(rows);renderTable(rows);});
+  // Single delegated handler for both filter rows
+  const filterContainer = content.querySelector('.section-card:last-child');
+  filterContainer.addEventListener('click',e=>{
+    const btn=e.target.closest('.filter-btn');if(!btn)return;
+    const group=btn.dataset.group;
+    const filter=btn.dataset.filter;
+    if(group==='batch'){
+      currentBatchFilter=filter;
+      content.querySelectorAll('#filterRow .filter-btn').forEach(b=>b.classList.remove('active'));
+    } else if(group==='billing'){
+      currentBillingFilter=filter;
+      content.querySelectorAll('#billingRow .filter-btn').forEach(b=>b.classList.remove('active'));
+    }
+    btn.classList.add('active');
+    renderTable(rows);
+  });
+  renderTable(rows);
+}
+
+function updateProviderUI(){
+  const allActive=currentProviderFilter==='all';
+  document.querySelectorAll('.provider-card').forEach(c=>c.classList.toggle('active',c.dataset.provider===currentProviderFilter));
+  const ab=document.getElementById('provAllBtn');if(ab)ab.classList.toggle('active',allActive);
+  const lbl=document.getElementById('provFilterLabel');
+  if(lbl){lbl.style.display=allActive?'none':'inline';if(!allActive)lbl.innerHTML=`Filtering: <strong>${currentProviderFilter}</strong>`;}
+}
+
+// ═══════════════════════════════════════════════
+// PLAN HELPERS
+// ═══════════════════════════════════════════════
+function planKey(){return allMonthData.sortedKeys[currentMonthIdx];}
+function calKey(){return planKey()+'::'+planBatchType;}
+
+function getStimDays(globalIdx){
+  const mk=planKey();
+  return planData[mk]&&planData[mk][globalIdx]!=null ? planData[mk][globalIdx] : 11;
+}
+function setStimDays(globalIdx,val){
+  const mk=planKey();
+  if(!planData[mk])planData[mk]={};
+  planData[mk][globalIdx]=val;
+}
+
+// Auto-distribute patients across Mon-Fri.
+// Eggs batch: hard cap of 5 per day. IVF: maximize evenness, no cap.
+function autoDistribute(patients){
+  const ck=calKey();
+  if(!calAssignments[ck])calAssignments[ck]={};
+  const isEggs = planBatchType==='ef';
+  const CAP = isEggs ? 5 : Infinity;
+
+  const dayCounts=[0,0,0,0,0];
+  for(const p of patients){
+    const a=calAssignments[ck][p.globalIdx];
+    if(a!=null&&a>=0&&a<=4) dayCounts[a]++;
+  }
+  for(const p of patients){
+    if(calAssignments[ck][p.globalIdx]==null){
+      // Find the least-loaded day that is under the cap
+      let minDay=-1, minCount=Infinity;
+      for(let i=0;i<5;i++){
+        if(dayCounts[i]<CAP && dayCounts[i]<minCount){
+          minCount=dayCounts[i]; minDay=i;
+        }
+      }
+      // If all days at cap (Eggs overflow), assign to least-loaded anyway
+      if(minDay===-1) minDay=dayCounts.indexOf(Math.min(...dayCounts));
+      calAssignments[ck][p.globalIdx]=minDay;
+      dayCounts[minDay]++;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════
+// SCREEN 2 — PLAN BATCH
+// ═══════════════════════════════════════════════
+function enterPlan(batchType){
+  planBatchType=batchType;
+  goToScreen(1);
+  renderPlanScreen();
+}
+
+function renderPlanScreen(){
+  const{sortedKeys,byMonth}=allMonthData;
+  const key=sortedKeys[currentMonthIdx];
+  const mk=planKey();
+
+  // Filter: cleared only + correct batch type only + not removed
+  const removed=removedPatients[mk]||new Set();
+  const patients=byMonth[key]
+    .map((r,i)=>({...r,globalIdx:i}))
+    .filter(r=>r.batch===planBatchType&&r.billing==='cleared'&&!removed.has(r.globalIdx));
+
+  const bLabel=planBatchType==='ivf'?'IVF':'Eggs';
+  document.getElementById('planTitle').textContent=`Plan ${bLabel} Batch \u2014 ${monthKeyToLabel(key)}`;
+  document.getElementById('planSubtitle').textContent=`Cleared ${bLabel} patients only (${patients.length}). Adjust expected stim days, then go to Calendar.`;
+
+  // Update breadcrumb pill
+  document.querySelectorAll('.bc-batch-pill').forEach(e=>e.remove());
+  const bc1=document.getElementById('bc1');
+  const pill=document.createElement('span');
+  pill.className=`bc-batch-pill bc-pill-${planBatchType}`;
+  pill.textContent=bLabel;
+  bc1.appendChild(pill);
+
+  if(patients.length===0){
+    document.getElementById('planContent').innerHTML=`<div class="section-card"><p style="color:var(--text-muted);text-align:center;padding:28px 0">No cleared ${bLabel} patients in this batch.</p></div>`;
+    return;
+  }
+
+  // Group by provider
+  const groups={};
+  for(const p of patients){
+    if(!groups[p.provider])groups[p.provider]=[];
+    groups[p.provider].push(p);
+  }
+  const orderedProviders=Object.keys(groups).sort();
+
+  let html=`<div class="section-card"><div class="plan-table-wrap"><table class="plan-table">
+    <thead><tr><th>Patient</th><th>Provider</th><th>Billing</th><th>Stim Days</th></tr></thead>
+    <tbody id="planTableBody">`;
+
+  for(const prov of orderedProviders){
+    const pts=groups[prov];
+    html+=`<tr><td colspan="4" class="plan-group-hdr" style="border-left:3px solid ${planBatchType==='ivf'?'var(--green)':'var(--amber)'}">${prov} &mdash; ${pts.length} patient${pts.length!==1?'s':''}</td></tr>`;
+    for(const p of pts){
+      const stim=getStimDays(p.globalIdx);
+      html+=`<tr>
+        <td class="td-name">${p.patientName}</td>
+        <td>${p.provider}</td>
+        <td><span class="badge b-cleared">Cleared</span></td>
+        <td><input class="stim-input" type="number" min="8" max="18" data-idx="${p.globalIdx}" value="${stim}" title="Number of stim days (injections). Trigger = night after last stim day. Retrieval = trigger + 1 day."></td>
+      </tr>`;
+    }
+  }
+
+  html+=`</tbody></table></div>
+  <div class="plan-footer">
+    <button class="btn btn-primary" onclick="savePlan()">&#10003; Save</button>
+    <button class="btn btn-amber" onclick="goToCalFromPlan()">View Calendar &#8594;</button>
+    <span class="save-indicator" id="saveIndicator"></span>
+  </div></div>`;
+
+  document.getElementById('planContent').innerHTML=html;
+
+  document.getElementById('planTableBody').addEventListener('input',e=>{
+    const el=e.target;if(!el.classList.contains('stim-input'))return;
+    const idx=parseInt(el.dataset.idx);
+    const val=Math.max(8,Math.min(18,parseInt(el.value)||11));
+    setStimDays(idx,val);
+    // Invalidate cal assignment for this patient so it gets re-computed if day changes
+    const ck=calKey();
+    if(calAssignments[ck])delete calAssignments[ck][idx];
+    document.getElementById('saveIndicator').textContent='';
+  });
+}
+
+function savePlan(){
+  const ind=document.getElementById('saveIndicator');
+  if(ind){ind.textContent='Saved &#10003;';setTimeout(()=>{if(ind)ind.textContent='';},2000);}
+}
+
+function goToCalFromPlan(){
+  // Save any pending changes first
+  savePlan();
+  goToScreen(2);
+  renderCalScreen();
+}
+
+// ═══════════════════════════════════════════════
+// SCREEN 3 — CALENDAR
+// ═══════════════════════════════════════════════
+
+function getCalWeekMonday(ck, fallbackKey) {
+  if (calWeekStart[ck]) {
+    return new Date(calWeekStart[ck] + 'T12:00:00');
+  }
+  return firstMondayOf(fallbackKey);
+}
+
+function getCalWeekDays(ck, fallbackKey) {
+  const monday = getCalWeekMonday(ck, fallbackKey);
+  // End date
+  let endDate = null;
+  if (calWeekEnd[ck]) {
+    endDate = new Date(calWeekEnd[ck] + 'T12:00:00');
+  }
+  // Build Mon-Fri days between monday and endDate (inclusive), skip weekends
+  const days = [];
+  const cur = new Date(monday);
+  const limit = endDate || addDays(monday, 4); // default = Mon-Fri (5 days)
+  while (cur <= limit) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) days.push(new Date(cur)); // skip Sat/Sun
+    cur.setDate(cur.getDate() + 1);
+  }
+  // Always show at least Mon-Fri
+  if (days.length === 0) {
+    for (let i = 0; i < 5; i++) days.push(addDays(monday, i));
+  }
+  return days;
+}
+
+function renderCalScreen(){
+  const{sortedKeys,byMonth}=allMonthData;
+  const key=sortedKeys[currentMonthIdx];
+  const mk=planKey();
+  const ck=calKey();
+  const bLabel=planBatchType==='ivf'?'IVF':'Eggs';
+
+  document.getElementById('calTitle').textContent=`${bLabel} Retrieval Calendar \u2014 ${monthKeyToLabel(key)}`;
+
+  // Get cleared patients of this batch type, excluding removed
+  const removed=removedPatients[mk]||new Set();
+  const patients=byMonth[key]
+    .map((r,i)=>({...r,globalIdx:i}))
+    .filter(r=>r.batch===planBatchType&&r.billing==='cleared'&&!removed.has(r.globalIdx));
+
+  if(patients.length===0){
+    document.getElementById('calContent').innerHTML=`<div class="section-card"><p style="color:var(--text-muted);text-align:center;padding:28px">No cleared ${bLabel} patients in this batch.</p></div>`;
+    return;
+  }
+
+  // Initialize assignments dict — do NOT auto-distribute
+  if(!calAssignments[ck])calAssignments[ck]={};
+
+  // Compute week days from user-set range or default
+  const weekDays = getCalWeekDays(ck, key);
+  const numDays = weekDays.length;
+
+  // Count totals
+  const totalPts=patients.length;
+  const scheduled=patients.filter(p=>calAssignments[ck][p.globalIdx]!=null&&calAssignments[ck][p.globalIdx]>=0&&calAssignments[ck][p.globalIdx]<numDays).length;
+
+  // Group patients by assigned day
+  const byDay={};
+  for(let i=0;i<numDays;i++) byDay[i]=[];
+  const poolPts=[];
+  for(const p of patients){
+    const a=calAssignments[ck][p.globalIdx];
+    if(a!=null&&a>=0&&a<numDays) byDay[a].push(p);
+    else poolPts.push(p);
+  }
+
+  // Heavy day detection
+  const dayCounts=Object.values(byDay).map(arr=>arr.length);
+  const maxCount=Math.max(...dayCounts,1);
+  const isEggsMode=planBatchType==='ef';
+  const EGGS_CAP=5;
+
+  // Current date picker values
+  const vorMonday = getCalWeekMonday(ck, key);
+  const mondayISO = vorMonday.toISOString().slice(0,10);
+  const endISO = calWeekEnd[ck] || addDays(vorMonday, 4).toISOString().slice(0,10);
+
+  let html=`
+  <div class="cal-topbar anim d1">
+    <div class="cal-total-chip">
+      <div class="cal-total-val">${scheduled}</div>
+      <div class="cal-total-denom">/ ${totalPts}</div>
+      <div class="cal-total-label">Placed / Total</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div class="cal-legend">
+        <span><span class="leg-dot leg-${planBatchType}"></span>${bLabel}</span>
+        ${planBatchType==='ef'?'<span style="font-size:10px;color:var(--amber);font-weight:600;">Max 5/day</span>':''}
+        <span style="font-size:10px;color:var(--text-dim)">Drag patients from pool below</span>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="downloadExcel()" style="display:flex;align-items:center;gap:5px;">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M8 10l-3-3M8 10l3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="12" width="12" height="2" rx="1" fill="currentColor"/></svg>
+        Download Excel
+      </button>
+    </div>
+  </div>
+
+  <!-- DATE RANGE CONTROLS -->
+  <div class="section-card anim d2" style="margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;">Target VOR Week Start (Monday)</div>
+        <input type="date" id="vorStartInput" value="${mondayISO}"
+          style="padding:6px 10px;border:1px solid var(--border2);border-radius:7px;font-family:'Montserrat',sans-serif;font-size:13px;color:var(--text);">
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px;">Range End Date (for wiggle room)</div>
+        <input type="date" id="vorEndInput" value="${endISO}"
+          style="padding:6px 10px;border:1px solid var(--border2);border-radius:7px;font-family:'Montserrat',sans-serif;font-size:13px;color:var(--text);">
+      </div>
+      <div style="align-self:flex-end;">
+        <button class="btn btn-secondary btn-sm" onclick="applyVORDates()">Apply Dates</button>
+      </div>
+      <div style="align-self:flex-end;font-size:11px;color:var(--text-muted);">
+        Showing ${numDays} day${numDays!==1?'s':''} &middot; Weekends excluded
+      </div>
+    </div>
+  </div>`;
+
+  // Unscheduled pool — always visible, patients start here
+  html+=`<div class="unscheduled-pool anim d2" style="margin-bottom:14px;">
+    <div class="pool-label">Patient Bank — drag to assign a retrieval day (${poolPts.length} unassigned${scheduled>0?', '+scheduled+' placed':''})</div>
+    <div class="pool-chips" id="pool-drop" data-day="pool">`;
+  if(poolPts.length===0){
+    html+=`<div style="color:var(--text-dim);font-size:12px;padding:8px;font-style:italic;">All patients placed ✓</div>`;
+  } else {
+    for(const p of poolPts.sort((a,b)=>a.patientName.localeCompare(b.patientName))){
+      html+=chipHTML(p,mk,ck);
+    }
+  }
+  html+=`</div></div>`;
+
+  html+=`<div class="cal-grid anim d3" style="grid-template-columns:repeat(${Math.min(numDays,5)},1fr);">`;
+
+  for(let di=0;di<numDays;di++){
+    const d=weekDays[di];
+    const pts=byDay[di];
+    const isHeavy=isEggsMode ? pts.length>EGGS_CAP : (pts.length===maxCount&&pts.length>1&&maxCount>1);
+    const isOverCap=isEggsMode&&pts.length>EGGS_CAP;
+    const avgStim=pts.length>0?Math.round(pts.reduce((s,p)=>s+getStimDays(p.globalIdx),0)/pts.length):11;
+    const startDate=addDays(d,-avgStim);
+
+    html+=`<div class="cal-col${isHeavy?' heavy':''}${isOverCap?' over-cap':''}" id="col-${di}" data-day="${di}">
+      <div class="cal-col-header">
+        <div class="cal-col-day">${DAY_NAMES[d.getDay()]}</div>
+        <div style="font-family:'Playfair Display',serif;font-size:16px;color:var(--text);line-height:1.2;">${fmtShortDate(d)}</div>
+        <div class="cal-col-count">${pts.length} patient${pts.length!==1?'s':''}${isOverCap?' ⚠ over limit':''}</div>
+        ${pts.length>0?`<div style="font-size:9px;color:var(--text-dim);margin-top:2px;">stim start ~${fmtShortDate(startDate)}</div>`:''}
+      </div>
+      <div class="cal-patients" id="patients-${di}" data-day="${di}">`;
+
+    if(pts.length===0){
+      html+=`<div class="cal-empty">Drop here</div>`;
+    } else {
+      for(const p of pts.sort((a,b)=>a.patientName.localeCompare(b.patientName))){
+        html+=chipHTML(p,mk,ck);
+      }
+    }
+    html+=`</div></div>`;
+  }
+
+  html+=`</div>`;
+
+  // ── MED START DATES ──
+  const allStartMap = {};
+  for(let di=0;di<numDays;di++){
+    const retDay = weekDays[di];
+    for(const p of byDay[di]){
+      const stim = getStimDays(p.globalIdx);
+      const sd = addDays(retDay, -stim);
+      const iso = sd.getFullYear()+'-'+String(sd.getMonth()+1).padStart(2,'0')+'-'+String(sd.getDate()).padStart(2,'0');
+      if(!allStartMap[iso]) allStartMap[iso]={date:sd, patients:[]};
+      allStartMap[iso].patients.push({...p, retDayIdx:di, stimDays:stim});
+    }
+  }
+  const sortedStartDates = Object.values(allStartMap).sort((a,b)=>a.date-b.date);
+
+  html+=`<div style="margin-top:18px;margin-bottom:6px;">
+    <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+      Med Start Dates
+      <span style="font-size:9px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--text-dim);">↳ day 1 of injections · trigger night after last stim day · retrieval next day</span>
+    </div>`;
+
+  if(sortedStartDates.length===0){
+    html+=`<div style="color:var(--text-dim);font-size:12px;padding:12px 0;">No patients assigned yet — drag patients from the bank above.</div>`;
+  } else {
+    const cols = Math.min(sortedStartDates.length, 5);
+    html+=`<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px;align-items:start;">`;
+    for(const entry of sortedStartDates){
+      const dow = DAY_FULL[entry.date.getDay()];
+      const dateStr = fmtShortDate(entry.date);
+      const color = planBatchType==='ivf'?'var(--green)':'var(--amber)';
+      const borderColor = planBatchType==='ivf'?'var(--green)':'var(--amber)';
+      html+=`<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="padding:10px 12px;background:var(--cream);border-bottom:1px solid var(--border);border-top:3px solid ${borderColor};">
+          <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${color};">${dow}</div>
+          <div style="font-family:'Playfair Display',serif;font-size:16px;color:var(--text);line-height:1.2;margin-top:1px;">${dateStr}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px;">${entry.patients.length} patient${entry.patients.length!==1?'s':''} · stim day 1</div>
+        </div>
+        <div style="padding:8px;">`;
+      for(const p of entry.patients.sort((a,b)=>a.patientName.localeCompare(b.patientName))){
+        const retDay = weekDays[p.retDayIdx];
+        const chipClass = planBatchType==='ivf'?'chip-ivf':'chip-ef';
+        html+=`<div class="${chipClass}" style="border-radius:7px;padding:7px 9px;margin-bottom:5px;font-size:12px;">
+          <div style="font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;">${p.patientName}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:1px;">${p.provider} &middot; ${p.stimDays}d &rarr; retrieval ${DAY_NAMES[retDay.getDay()]} ${fmtShortDate(retDay)}</div>
+        </div>`;
+      }
+      html+=`</div></div>`;
+    }
+    html+=`</div>`;
+  }
+
+  html+=`</div>`; // close med start dates wrapper
+
+  document.getElementById('calContent').innerHTML=html;
+
+  // Wire date pickers
+  document.getElementById('vorStartInput').addEventListener('change', function(){
+    // snap to Monday of selected week
+    const d = new Date(this.value+'T12:00:00');
+    const dow = d.getDay();
+    const offset = dow===0?1:-(dow-1);
+    const monday = addDays(d, offset);
+    calWeekStart[ck] = monday.toISOString().slice(0,10);
+    // If end is before new monday, push it to Fri of that week
+    if(!calWeekEnd[ck]||calWeekEnd[ck]<calWeekStart[ck]){
+      calWeekEnd[ck] = addDays(monday,4).toISOString().slice(0,10);
+    }
+  });
+  document.getElementById('vorEndInput').addEventListener('change', function(){
+    calWeekEnd[ck] = this.value;
+  });
+
+  // Wire drag and drop (pool is always a drop zone)
+  wireDragDrop(patients,ck,numDays);
+}
+
+function applyVORDates(){
+  const ck=calKey();
+  const startEl=document.getElementById('vorStartInput');
+  const endEl=document.getElementById('vorEndInput');
+  if(startEl&&startEl.value){
+    const d=new Date(startEl.value+'T12:00:00');
+    const dow=d.getDay();
+    // Snap to Monday of the same week: Sun→+1, Mon→0, Tue-Sat→back
+    const offset=dow===0?1:-(dow-1);
+    const monday=addDays(d,offset);
+    calWeekStart[ck]=monday.toISOString().slice(0,10);
+  }
+  if(endEl&&endEl.value){
+    calWeekEnd[ck]=endEl.value;
+  }
+  renderCalScreen();
+}
+
+// ═══════════════════════════════════════════════
+// EXCEL EXPORT
+// ═══════════════════════════════════════════════
+function downloadExcel(){
+  const{sortedKeys,byMonth}=allMonthData;
+  const key=sortedKeys[currentMonthIdx];
+  const ck=calKey();
+  const bLabel=planBatchType==='ivf'?'IVF':'Eggs';
+  const weekDays=getCalWeekDays(ck,key);
+
+  const patients=byMonth[key]
+    .map((r,i)=>({...r,globalIdx:i}))
+    .filter(r=>r.batch===planBatchType&&r.billing==='cleared');
+
+  // Build rows: one per patient
+  const rows=[];
+  for(const p of patients){
+    const di = calAssignments[ck]&&calAssignments[ck][p.globalIdx]!=null ? calAssignments[ck][p.globalIdx] : null;
+    const stim = getStimDays(p.globalIdx);
+    const retDay = di!=null ? weekDays[di] : null;
+    // retrieval = medStart + stimDays  →  medStart = retrieval - stimDays
+    const startDay = retDay ? addDays(retDay, -stim) : null;
+    const fmt = d => d ? `${DAY_FULL[d.getDay()]} ${fmtShortDate(d)}` : '';
+    rows.push({
+      'Patient':       p.patientName,
+      'Provider':      p.provider,
+      'Batch':         bLabel,
+      'Billing':       'Cleared',
+      'Stim Days':     stim,
+      'Med Start Date':fmt(startDay),
+      'Retrieval Day': fmt(retDay),
+    });
+  }
+
+  // Sort by med start date then patient name
+  rows.sort((a,b)=>{
+    if(a['Med Start Date']!==b['Med Start Date']) return a['Med Start Date'].localeCompare(b['Med Start Date']);
+    return a['Patient'].localeCompare(b['Patient']);
+  });
+
+  // Load SheetJS on demand then generate
+  if(typeof XLSX==='undefined'){
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=()=>_buildAndDownload(rows,bLabel,monthKeyToLabel(key));
+    s.onerror=()=>alert('Could not load Excel library. Check your internet connection.');
+    document.head.appendChild(s);
+  } else {
+    _buildAndDownload(rows,bLabel,monthKeyToLabel(key));
+  }
+}
+
+function _buildAndDownload(rows,bLabel,monthLabel){
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  // Column widths
+  ws['!cols']=[
+    {wch:28},{wch:12},{wch:14},{wch:10},{wch:10},{wch:26},{wch:26}
+  ];
+
+  // Style the header row (SheetJS CE supports basic styles via sheet_add_aoa)
+  XLSX.utils.book_append_sheet(wb, ws, `${bLabel} Batch`);
+
+  // Summary sheet
+  const summary=[
+    ['Terra Fertility — Batch Schedule Export'],
+    [''],
+    ['Batch',         bLabel],
+    ['Month',         monthLabel],
+    ['Generated',     new Date().toLocaleString()],
+    ['Total Patients',rows.length],
+    [''],
+    ['Retrieval Day','Patients'],
+  ];
+  const byRet={};
+  for(const r of rows){
+    const k=r['Retrieval Day']||'Unassigned';
+    if(!byRet[k])byRet[k]=[];
+    byRet[k].push(r['Patient']);
+  }
+  for(const[day,pts] of Object.entries(byRet).sort()){
+    summary.push([day, pts.join(', ')]);
+  }
+  const wsSummary = XLSX.utils.aoa_to_sheet(summary);
+  wsSummary['!cols']=[{wch:30},{wch:60}];
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+  XLSX.writeFile(wb, `Terra_${bLabel.replace(' ','_')}_Batch_${monthLabel.replace(' ','_')}.xlsx`);
+}
+
+function treatmentShort(raw) {
+  if(!raw) return '';
+  const t = raw.toLowerCase();
+  if(t.includes('fresh')) return 'Fresh ET';
+  if(t.includes('freeze all')||t.includes('freeze-all')) return 'Freeze All';
+  if(t.includes('egg freez')||t.includes('egg bank')||t.includes('oocyte')) return 'Egg Freeze';
+  if(t.includes('cryo')&&t.includes('pgt')) return 'Cryo+PGT';
+  if(t.includes('cryo')||t.includes('frozen')) return 'Cryo ET';
+  if(t.includes('pgt')) return 'PGT';
+  if(t.includes('ivf')) return 'IVF';
+  return raw.length>18 ? raw.slice(0,17)+'…' : raw;
+}
+
+function chipHTML(p,mk,ck){
+  const stim=getStimDays(p.globalIdx);
+  const chipClass=planBatchType==='ivf'?'chip-ivf':'chip-ef';
+  const txShort=treatmentShort(p.treatment);
+  const txBadge=txShort?`<span style="display:inline-block;font-size:9px;font-weight:600;letter-spacing:0.04em;padding:1px 5px;border-radius:3px;background:rgba(0,0,0,0.07);color:var(--text-mid);margin-left:3px;">${txShort}</span>`:'';
+  return `<div class="chip ${chipClass}" draggable="true" data-idx="${p.globalIdx}" title="${p.treatment||''} · Stim: ${stim}d">
+    <div class="chip-name">${p.patientName}${txBadge}</div>
+    <div class="chip-meta">${p.provider} &middot; ${stim}d stim</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════
+// DRAG AND DROP
+// ═══════════════════════════════════════════════
+let dragIdx=null;
+let dragSourceDay=null;
+
+function wireDragDrop(patients,ck,numDays){
+  numDays = numDays||5;
+  // All chips
+  document.querySelectorAll('.chip').forEach(chip=>{
+    chip.addEventListener('dragstart',e=>{
+      dragIdx=parseInt(chip.dataset.idx);
+      const col=chip.closest('[data-day]');
+      dragSourceDay=col?col.dataset.day:null;
+      chip.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+    });
+    chip.addEventListener('dragend',()=>{
+      chip.classList.remove('dragging');
+      document.querySelectorAll('.cal-col,.pool-chips').forEach(z=>z.classList.remove('drag-over'));
+    });
+  });
+
+  // Drop zones: patient areas inside columns
+  document.querySelectorAll('.cal-patients, .pool-chips').forEach(zone=>{
+    zone.addEventListener('dragover',e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      // Highlight parent col
+      const col=zone.closest('.cal-col');
+      document.querySelectorAll('.cal-col,.pool-chips').forEach(z=>z.classList.remove('drag-over'));
+      if(col)col.classList.add('drag-over');
+      else zone.classList.add('drag-over');
+    });
+    zone.addEventListener('dragleave',e=>{
+      if(!zone.contains(e.relatedTarget)){
+        const col=zone.closest('.cal-col');
+        if(col)col.classList.remove('drag-over');
+        else zone.classList.remove('drag-over');
+      }
+    });
+    zone.addEventListener('drop',e=>{
+      e.preventDefault();
+      if(dragIdx==null)return;
+      const targetDay=zone.dataset.day;
+      if(targetDay==='pool'){
+        calAssignments[ck][dragIdx]=null;
+      } else {
+        const di=parseInt(targetDay);
+        if(!isNaN(di)&&di>=0&&di<numDays) calAssignments[ck][dragIdx]=di;
+      }
+      dragIdx=null;
+      renderCalScreen(); // re-render with new assignment
+    });
+  });
+
+  // Also allow dropping directly on cal-col header area
+  document.querySelectorAll('.cal-col').forEach(col=>{
+    col.addEventListener('dragover',e=>{
+      e.preventDefault();
+      document.querySelectorAll('.cal-col').forEach(c=>c.classList.remove('drag-over'));
+      col.classList.add('drag-over');
+    });
+    col.addEventListener('drop',e=>{
+      e.preventDefault();
+      if(dragIdx==null)return;
+      const di=parseInt(col.dataset.day);
+      if(!isNaN(di)){calAssignments[ck][dragIdx]=di;}
+      dragIdx=null;
+      renderCalScreen();
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════
+function goToScreen(n){
+  document.querySelectorAll('.screen').forEach((s,i)=>s.classList.toggle('active',i===n));
+  document.querySelectorAll('.bc-step').forEach((s,i)=>{
+    s.classList.remove('active','done','locked');
+    if(i<n)s.classList.add('done');
+    else if(i===n)s.classList.add('active');
+    else s.classList.add(allMonthData?'done':'locked');
+  });
+  if(allMonthData)document.querySelectorAll('.bc-step').forEach(s=>s.classList.remove('locked'));
+  currentScreen=n;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ═══════════════════════════════════════════════
+// STATUS
+// ═══════════════════════════════════════════════
+function showStatus(msg,type='error'){
+  const el=document.getElementById('statusMsg');
+  el.innerHTML=msg;el.className=`status-msg ${type}`;el.style.display='block';
+  if(type!=='error')setTimeout(()=>{el.style.display='none';},5000);
+}
+
+// ═══════════════════════════════════════════════
+// FILE HANDLING
+// ═══════════════════════════════════════════════
+function handleFile(file){
+  if(!file)return;
+  if(!file.name.match(/\.csv$/i)&&!file.type.includes('csv')&&!file.type.includes('text')){
+    showStatus(`Expected a .csv file, got "${file.name}".`);return;
+  }
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      document.getElementById('statusMsg').style.display='none';
+      const rows=parseCSV(e.target.result);
+      const grouped=groupByMonth(rows);
+      if(grouped.sortedKeys.length===0){showStatus('No cycles found in the current month or next 6 months. Check that your export includes upcoming planned start dates.');return;}
+      allMonthData=grouped;planData={};calAssignments={};removedPatients={};
+      currentBatchFilter='all';currentBillingFilter='all';currentProviderFilter='all';currentMonthIdx=0;planBatchType='ivf';
+      document.getElementById('dashboardContent').style.display='block';
+      document.getElementById('dropZone').style.display='none';
+      document.querySelectorAll('.bc-step').forEach(s=>s.classList.remove('locked'));
+      const winTotal=grouped.sortedKeys.reduce((n,k)=>n+grouped.byMonth[k].length,0);
+      const outside=rows.length-winTotal;
+      const now=new Date();
+      document.getElementById('fileInfo').innerHTML=`${file.name}<br>${winTotal} cycles &middot; ${grouped.sortedKeys.length} month${grouped.sortedKeys.length!==1?'s':''}${outside>0?` &middot; ${outside} outside window`:''} &middot; ${now.toLocaleTimeString()}`;
+      renderMonthTabs();renderCurrentMonth();
+    }catch(err){showStatus(`Parse error: ${err.message}`);}
+  };
+  reader.onerror=()=>showStatus('Could not read file. Try re-exporting from EMR.');
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════
+// EVENT WIRING
+// ═══════════════════════════════════════════════
+const dropZone=document.getElementById('dropZone');
+const fileInput=document.getElementById('fileInput');
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag-over');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('drag-over');handleFile(e.dataTransfer.files[0]);});
+dropZone.addEventListener('click',e=>{if(e.target.tagName==='LABEL'||e.target.classList.contains('btn'))return;fileInput.click();});
+fileInput.addEventListener('change',()=>handleFile(fileInput.files[0]));
+document.getElementById('prevMonth').addEventListener('click',()=>{if(currentMonthIdx>0){currentMonthIdx--;currentProviderFilter='all';currentBatchFilter='all';currentBillingFilter='all';renderMonthTabs();renderCurrentMonth();}});
+document.getElementById('nextMonth').addEventListener('click',()=>{if(allMonthData&&currentMonthIdx<allMonthData.sortedKeys.length-1){currentMonthIdx++;currentProviderFilter='all';currentBatchFilter='all';currentBillingFilter='all';renderMonthTabs();renderCurrentMonth();}});
+document.getElementById('monthTabs').addEventListener('click',e=>{const tab=e.target.closest('.month-tab');if(!tab)return;currentMonthIdx=parseInt(tab.dataset.idx);currentProviderFilter='all';currentBatchFilter='all';currentBillingFilter='all';renderMonthTabs();renderCurrentMonth();});
+document.getElementById('breadcrumb').addEventListener('click',e=>{
+  const step=e.target.closest('.bc-step');
+  if(!step||step.classList.contains('locked')||!allMonthData)return;
+  const n=parseInt(step.dataset.screen);if(n===currentScreen)return;
+  goToScreen(n);
+  if(n===1)renderPlanScreen();
+  if(n===2)renderCalScreen();
+});
+</script>
+</body>
+</html>
