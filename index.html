@@ -236,6 +236,16 @@ tbody td{padding:10px 12px;color:var(--text);white-space:nowrap;}
 .pool-chips{display:flex;flex-wrap:wrap;gap:6px;min-height:40px;padding:6px;border:2px dashed var(--border2);border-radius:8px;transition:border-color 0.15s;}
 .pool-chips.drag-over{border-color:var(--green);background:var(--green-pale);}
 
+/* Cancel / Trash zone */
+.cancel-zone{border:2px dashed #e0b0a8;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:10px;transition:all 0.15s;background:var(--red-bg);cursor:default;min-height:44px;}
+.cancel-zone.drag-over{border-color:var(--red);background:#fce4df;transform:scale(1.01);}
+.cancel-zone-label{font-size:11px;font-weight:600;color:var(--red);letter-spacing:0.06em;text-transform:uppercase;}
+.cancel-zone-sub{font-size:10px;color:#b06050;margin-top:1px;}
+.cancelled-chip{background:#fce4df;border-left:3px solid var(--red);border-radius:7px;padding:5px 9px;font-size:11px;display:flex;align-items:center;gap:7px;}
+.cancelled-chip-name{font-weight:600;color:var(--red);text-decoration:line-through;opacity:0.8;}
+.undo-btn{font-size:10px;font-weight:600;color:var(--green);background:var(--green-light);border:none;border-radius:4px;padding:2px 7px;cursor:pointer;white-space:nowrap;}
+.undo-btn:hover{background:var(--green);color:#fff;}
+
 /* ANIMATIONS */
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 .anim{animation:fadeUp 0.3s ease both;}
@@ -945,13 +955,18 @@ function renderCalScreen(){
 
   document.getElementById('calTitle').textContent=`${bLabel} Retrieval Calendar \u2014 ${monthKeyToLabel(key)}`;
 
-  // Get cleared patients of this batch type, excluding removed
+  // Get ALL cleared patients of this batch type (before removal filter)
   const removed=removedPatients[mk]||new Set();
-  const patients=byMonth[key]
+  const allPatients=byMonth[key]
     .map((r,i)=>({...r,globalIdx:i}))
-    .filter(r=>r.batch===planBatchType&&r.billing==='cleared'&&!removed.has(r.globalIdx));
+    .filter(r=>r.batch===planBatchType&&r.billing==='cleared');
 
-  if(patients.length===0){
+  // Active patients (not cancelled)
+  const patients=allPatients.filter(r=>!removed.has(r.globalIdx));
+  // Cancelled patients (in this batch, dragged to trash)
+  const cancelledPts=allPatients.filter(r=>removed.has(r.globalIdx));
+
+  if(patients.length===0&&cancelledPts.length===0){
     document.getElementById('calContent').innerHTML=`<div class="section-card"><p style="color:var(--text-muted);text-align:center;padding:28px">No cleared ${bLabel} patients in this batch.</p></div>`;
     return;
   }
@@ -1031,8 +1046,12 @@ function renderCalScreen(){
   </div>`;
 
   // Unscheduled pool — always visible, patients start here
-  html+=`<div class="unscheduled-pool anim d2" style="margin-bottom:14px;">
-    <div class="pool-label">Patient Bank — drag to assign a retrieval day (${poolPts.length} unassigned${scheduled>0?', '+scheduled+' placed':''})</div>
+  const cancelledCount = cancelledPts.length;
+  html+=`<div class="unscheduled-pool anim d2" style="margin-bottom:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div class="pool-label" style="margin-bottom:0;">Patient Bank — drag to assign a retrieval day (${poolPts.length} unassigned${scheduled>0?', '+scheduled+' placed':''})</div>
+      <button class="btn btn-secondary btn-sm" onclick="clearPatientBank()" title="Return all placed patients back to the bank">Clear Bank</button>
+    </div>
     <div class="pool-chips" id="pool-drop" data-day="pool">`;
   if(poolPts.length===0){
     html+=`<div style="color:var(--text-dim);font-size:12px;padding:8px;font-style:italic;">All patients placed ✓</div>`;
@@ -1042,6 +1061,27 @@ function renderCalScreen(){
     }
   }
   html+=`</div></div>`;
+
+  // Cancel / trash zone
+  html+=`<div style="margin-bottom:14px;">
+    <div class="cancel-zone anim d2" id="cancel-zone" data-day="cancel">
+      <div style="flex-shrink:0;font-size:18px;">🗑</div>
+      <div style="flex:1;">
+        <div class="cancel-zone-label">Cancel Patient</div>
+        <div class="cancel-zone-sub">Drag a chip here to remove from this batch</div>
+      </div>
+      ${cancelledCount>0?`<div style="font-size:10px;color:var(--red);font-weight:600;">${cancelledCount} cancelled</div>`:''}
+    </div>
+    ${cancelledCount>0?`<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;padding:0 4px;" id="cancelled-list">
+      ${cancelledPts.map(p=>`<div class="cancelled-chip">
+        <div>
+          <div class="cancelled-chip-name">${p.patientName}</div>
+          <div style="font-size:9px;color:#b06050;">${p.provider}</div>
+        </div>
+        <button class="undo-btn" onclick="undoCancelPatient(${p.globalIdx})">Restore</button>
+      </div>`).join('')}
+    </div>`:''}
+  </div>`;
 
   html+=`<div class="cal-grid anim d3" style="grid-template-columns:repeat(${Math.min(numDays,5)},1fr);">`;
 
@@ -1147,6 +1187,22 @@ function renderCalScreen(){
 
   // Wire drag and drop (pool is always a drop zone)
   wireDragDrop(patients,ck,numDays);
+}
+
+function clearPatientBank(){
+  const ck=calKey();
+  // Reset all calendar assignments — returns everyone to pool
+  calAssignments[ck]={};
+  renderCalScreen();
+}
+
+function undoCancelPatient(globalIdx){
+  const mk=planKey();
+  if(removedPatients[mk]) removedPatients[mk].delete(globalIdx);
+  // Clear any stale cal assignment for restored patient
+  const ck=calKey();
+  if(calAssignments[ck]) delete calAssignments[ck][globalIdx];
+  renderCalScreen();
 }
 
 function applyVORDates(){
@@ -1290,6 +1346,8 @@ let dragSourceDay=null;
 
 function wireDragDrop(patients,ck,numDays){
   numDays = numDays||5;
+  const mk=planKey();
+
   // All chips
   document.querySelectorAll('.chip').forEach(chip=>{
     chip.addEventListener('dragstart',e=>{
@@ -1301,18 +1359,17 @@ function wireDragDrop(patients,ck,numDays){
     });
     chip.addEventListener('dragend',()=>{
       chip.classList.remove('dragging');
-      document.querySelectorAll('.cal-col,.pool-chips').forEach(z=>z.classList.remove('drag-over'));
+      document.querySelectorAll('.cal-col,.pool-chips,.cancel-zone').forEach(z=>z.classList.remove('drag-over'));
     });
   });
 
-  // Drop zones: patient areas inside columns
+  // Drop zones: patient areas inside columns + pool
   document.querySelectorAll('.cal-patients, .pool-chips').forEach(zone=>{
     zone.addEventListener('dragover',e=>{
       e.preventDefault();
       e.dataTransfer.dropEffect='move';
-      // Highlight parent col
       const col=zone.closest('.cal-col');
-      document.querySelectorAll('.cal-col,.pool-chips').forEach(z=>z.classList.remove('drag-over'));
+      document.querySelectorAll('.cal-col,.pool-chips,.cancel-zone').forEach(z=>z.classList.remove('drag-over'));
       if(col)col.classList.add('drag-over');
       else zone.classList.add('drag-over');
     });
@@ -1334,15 +1391,40 @@ function wireDragDrop(patients,ck,numDays){
         if(!isNaN(di)&&di>=0&&di<numDays) calAssignments[ck][dragIdx]=di;
       }
       dragIdx=null;
-      renderCalScreen(); // re-render with new assignment
+      renderCalScreen();
     });
   });
+
+  // Cancel / trash zone drop target
+  const cancelZone=document.getElementById('cancel-zone');
+  if(cancelZone){
+    cancelZone.addEventListener('dragover',e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      document.querySelectorAll('.cal-col,.pool-chips').forEach(z=>z.classList.remove('drag-over'));
+      cancelZone.classList.add('drag-over');
+    });
+    cancelZone.addEventListener('dragleave',e=>{
+      if(!cancelZone.contains(e.relatedTarget)) cancelZone.classList.remove('drag-over');
+    });
+    cancelZone.addEventListener('drop',e=>{
+      e.preventDefault();
+      if(dragIdx==null)return;
+      // Mark patient as removed/cancelled
+      if(!removedPatients[mk]) removedPatients[mk]=new Set();
+      removedPatients[mk].add(dragIdx);
+      // Remove any calendar assignment
+      if(calAssignments[ck]) delete calAssignments[ck][dragIdx];
+      dragIdx=null;
+      renderCalScreen();
+    });
+  }
 
   // Also allow dropping directly on cal-col header area
   document.querySelectorAll('.cal-col').forEach(col=>{
     col.addEventListener('dragover',e=>{
       e.preventDefault();
-      document.querySelectorAll('.cal-col').forEach(c=>c.classList.remove('drag-over'));
+      document.querySelectorAll('.cal-col,.cancel-zone').forEach(c=>c.classList.remove('drag-over'));
       col.classList.add('drag-over');
     });
     col.addEventListener('drop',e=>{
